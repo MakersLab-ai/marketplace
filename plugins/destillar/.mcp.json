@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "destillar": {
+      "type": "http",
+      "url": "https://api.destillar.ai/mcp"
+    }
+  }
+}

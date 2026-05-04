@@ -1,0 +1,8 @@
+{
+  "name": "destillar",
+  "description": "Zugriff auf Philipp Maderthaners Wissensgraph über Destillar — für Wissensabfragen und Content-Erstellung",
+  "author": {
+    "name": "AI Makers Lab"
+  },
+  "keywords": ["destillar", "knowledge-graph", "content", "philipp-maderthaner"]
+}
