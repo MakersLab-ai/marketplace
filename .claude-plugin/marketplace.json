@@ -16,7 +16,29 @@
         "name": "AI Makers Lab"
       },
       "category": "knowledge",
-      "keywords": ["destillar", "knowledge-graph", "content", "philipp-maderthaner"]
+      "keywords": [
+        "destillar",
+        "knowledge-graph",
+        "content",
+        "philipp-maderthaner"
+      ]
+    },
+    {
+      "name": "groundcontrol-for-claude-code",
+      "source": "./plugins/groundcontrol-for-claude-code",
+      "description": "Run your Claude Code session as a coding agent that picks up GROUNDCONTROL tasks every 15 minutes, implements them, opens PRs, and closes the loop.",
+      "version": "0.1.0",
+      "author": {
+        "name": "AI Makers Lab"
+      },
+      "category": "task-management",
+      "keywords": [
+        "groundcontrol",
+        "task-management",
+        "coding-agent",
+        "automation",
+        "loop"
+      ]
     }
   ]
 }

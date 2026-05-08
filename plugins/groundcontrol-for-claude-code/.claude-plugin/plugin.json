@@ -1,0 +1,7 @@
+{
+  "name": "groundcontrol-for-claude-code",
+  "description": "Run your Claude Code session as a coding agent that picks up GROUNDCONTROL tasks every 15 minutes, implements them, opens PRs, and closes the loop.",
+  "version": "0.1.0",
+  "author": { "name": "AI Makers Lab" },
+  "keywords": ["groundcontrol", "task-management", "coding-agent", "automation", "loop"]
+}

@@ -5,7 +5,7 @@
 **Offizieller Plugin-Marketplace von [AI Makers Lab](https://makerslab.ai)**
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Marketplace-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en/plugin-marketplaces)
-[![Plugins](https://img.shields.io/badge/Plugins-1-6E56CF)](#-plugins)
+[![Plugins](https://img.shields.io/badge/Plugins-2-6E56CF)](#-plugins)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#-lizenz)
 
 Kuratierte Claude Code Plugins — gebaut für echten Workflow, nicht für Demos.
@@ -37,6 +37,7 @@ Das war's. Auto-Updates laufen ab jetzt bei jedem Start von Claude Code.
 | Plugin | Version | Beschreibung |
 |--------|:-------:|--------------|
 | [**`destillar`**](./plugins/destillar) | `0.5.0` | Zugriff auf Philipp Maderthaners Wissensgraph über Destillar — für Wissensabfragen und Content-Erstellung |
+| [**`groundcontrol-for-claude-code`**](./plugins/groundcontrol-for-claude-code) | `0.1.0` | Coding-Agent für GROUNDCONTROL — picks up assigned tasks, opens PRs, closes the loop. |
 
 > Mehr Plugins folgen. PRs willkommen.
 
