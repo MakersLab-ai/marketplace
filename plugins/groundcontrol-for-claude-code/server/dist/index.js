@@ -15452,10 +15452,6 @@ var StdioServerTransport = class {
   }
 };
 
-// src/index.ts
-var import_node_fs = require("node:fs");
-var import_node_path = require("node:path");
-
 // src/redact.ts
 function redactKey(input) {
   return input.replace(/gc_live_[A-Za-z0-9_-]+/g, "gc_live_<redacted>");
@@ -15581,6 +15577,40 @@ var GroundControlClient = class {
     return this.request("POST", `/journal/${date3}/summary`, { agent_summary: agentSummary });
   }
 };
+
+// src/dotenv.ts
+var import_node_fs = require("node:fs");
+var import_node_path = require("node:path");
+function findDotenv(startDir, home = process.env.HOME ?? "") {
+  let dir = (0, import_node_path.resolve)(startDir);
+  while (true) {
+    if (home && dir === home) return null;
+    const candidate = (0, import_node_path.resolve)(dir, ".env");
+    if ((0, import_node_fs.existsSync)(candidate)) return candidate;
+    const parent = (0, import_node_path.dirname)(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+function loadDotenv(cwd = process.cwd(), home = process.env.HOME ?? "") {
+  const path = findDotenv(cwd, home);
+  if (!path) return;
+  const content = (0, import_node_fs.readFileSync)(path, "utf8");
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    if (value !== "") {
+      process.env[key] = value;
+    }
+  }
+}
 
 // src/tools/context.ts
 var contextTools = [
@@ -16055,27 +16085,8 @@ var allTools = [
 ];
 
 // src/index.ts
-function loadDotenvFromCwd() {
-  const path = (0, import_node_path.resolve)(process.cwd(), ".env");
-  if (!(0, import_node_fs.existsSync)(path)) return;
-  const content = (0, import_node_fs.readFileSync)(path, "utf8");
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq < 0) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
-      value = value.slice(1, -1);
-    }
-    if (value !== "") {
-      process.env[key] = value;
-    }
-  }
-}
 function getConfig() {
-  loadDotenvFromCwd();
+  loadDotenv();
   const apiKey = process.env.GC_API_KEY ?? "";
   const apiUrl = process.env.GC_API_URL || "https://groundcontrol.makerslab.ai/api/v1";
   const initiativeId = process.env.GC_INITIATIVE_ID || void 0;
