@@ -23,7 +23,7 @@ Run this once per project. It collects the GROUNDCONTROL API key and optional in
 
 5. **Update `.gitignore`.** Both `.env` and `.gc-state.json` must be present. If `.gitignore` doesn't exist, create it with both entries. If it exists, append any missing ones (do not duplicate).
 
-6. **Verify the connection** by calling the MCP tool `gc_get_context`. The MCP server reads the freshly written `.env` on next invocation. If the call fails:
+6. **Verify the connection** by calling the MCP tool `gc_get_context`. The MCP server re-reads `.env` from the project root on every tool call, so the freshly written credentials take effect immediately — no Claude Code restart or `/mcp` reconnect is required. If the call fails:
    - 401 / "API key validation failed": ask the user to regenerate the key and try again.
    - Network error: surface the error and stop.
 

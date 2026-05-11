@@ -16055,7 +16055,7 @@ var allTools = [
 ];
 
 // src/index.ts
-function loadDotenvFallback() {
+function loadDotenvFromCwd() {
   const path = (0, import_node_path.resolve)(process.cwd(), ".env");
   if (!(0, import_node_fs.existsSync)(path)) return;
   const content = (0, import_node_fs.readFileSync)(path, "utf8");
@@ -16069,20 +16069,19 @@ function loadDotenvFallback() {
     if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
       value = value.slice(1, -1);
     }
-    if (process.env[key] === void 0 || process.env[key] === "") {
+    if (value !== "") {
       process.env[key] = value;
     }
   }
 }
 function getConfig() {
-  loadDotenvFallback();
+  loadDotenvFromCwd();
   const apiKey = process.env.GC_API_KEY ?? "";
   const apiUrl = process.env.GC_API_URL || "https://groundcontrol.makerslab.ai/api/v1";
   const initiativeId = process.env.GC_INITIATIVE_ID || void 0;
   return { apiKey, apiUrl, initiativeId };
 }
 async function main() {
-  const config2 = getConfig();
   const server = new Server(
     { name: "groundcontrol", version: "0.1.0" },
     { capabilities: { tools: {} } }
@@ -16099,6 +16098,7 @@ async function main() {
     if (!tool) {
       return { content: [{ type: "text", text: JSON.stringify({ error: `Unknown tool: ${req.params.name}` }) }], isError: true };
     }
+    const config2 = getConfig();
     if (!config2.apiKey) {
       return {
         content: [{ type: "text", text: JSON.stringify({ error: "GC_API_KEY is not set. Run /gc-init to configure this project." }) }],
