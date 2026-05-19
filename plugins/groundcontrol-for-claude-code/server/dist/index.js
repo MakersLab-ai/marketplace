@@ -15663,11 +15663,11 @@ var contextTools = [
 var taskTools = [
   {
     name: "gc_list_tasks",
-    description: 'List tasks with optional filters. Use `assigned_to: "me"` to get your own queue. Filter by status (backlog | scheduled | todo | in_progress | blocked | done) and priority (low | medium | high | critical).',
+    description: 'List tasks with optional filters. Use `assigned_to: "me"` to get your own queue. Filter by status (scheduled | todo | in_progress | blocked | done) and priority (low | medium | high | critical).',
     inputSchema: {
       type: "object",
       properties: {
-        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "done"] },
+        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"] },
         assigned_to: { type: "string", description: '"me" for your own tasks, or a tenant_member UUID' },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
         initiative_id: { type: "string" },
@@ -15701,7 +15701,7 @@ var taskTools = [
       properties: {
         title: { type: "string" },
         description: { type: "string" },
-        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "done"], default: "todo" },
+        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"], default: "todo" },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"], default: "medium" },
         initiative_id: { type: "string" },
         assigned_to: { type: "string", description: 'tenant_member UUID, or "me"' },
@@ -15724,7 +15724,7 @@ var taskTools = [
         id: { type: "string" },
         title: { type: "string" },
         description: { type: "string" },
-        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "done"] },
+        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"] },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
         assigned_to: { type: "string" },
         due_date: { type: "string" }
