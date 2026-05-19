@@ -1,0 +1,16 @@
+{
+  "name": "cambuildr",
+  "description": "Manage Cambuildr campaigns, landing pages, automated emails, target audiences, and supporters from Claude Code.",
+  "author": {
+    "name": "AI Makers Lab"
+  },
+  "keywords": [
+    "cambuildr",
+    "crm",
+    "campaigns",
+    "landing-pages",
+    "email-marketing",
+    "non-profit",
+    "automation"
+  ]
+}
