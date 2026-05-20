@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cambuildr": {
+      "type": "http",
+      "url": "${CAMBUILDR_MCP_URL}"
+    }
+  }
+}
