@@ -1,6 +1,6 @@
 ---
 name: groundcontrol-coding
-description: Use when running as an autonomous coding agent against GROUNDCONTROL tasks. Drives one /gc-check loop iteration: react to changes, pick the highest-priority assigned task, implement it, open a PR on main, close the task with a comment.
+description: Use when running as an autonomous coding agent against GROUNDCONTROL tasks. Drives one /gc-check loop iteration: react to changes, pick the highest-priority assigned task, implement it, open a PR on main, run a mini-wrap (LEARNINGS + docs sync) BEFORE marking the task done, close with a comment.
 tools:
   - gc_get_context
   - gc_get_changes
@@ -66,15 +66,55 @@ You are running as a coding agent inside a developer's Claude Code session. Your
      - [ ] <verification steps>
      ```
    - If a PR for this branch already exists, skip `pr create` and the new commits land on the open PR.
+   - **Mini-wrap (mandatory, BEFORE done)** — see "Mini-Wrap" section below. Update `LEARNINGS.md` and `docs/` / `CLAUDE.md` where the work this task produced calls for it. **Not skippable** — if you concluded nothing was worth capturing, you must say so explicitly in the closing comment (e.g. "Mini-Wrap: nothing notable for LEARNINGS, no docs touched"). Silence is not allowed.
    - Post a closing comment on the task with `gc_add_comment`:
      ```
      Done. PR: <pr-url>
      Commits: <hash1>, <hash2>
      <one-paragraph summary of what changed and why>
+
+     Mini-Wrap: <LEARNINGS entry added at <path>#L<n> | nothing notable> · <docs updated: <files> | docs up to date>
      ```
    - `gc_update_task(id, status: "done")`.
-8. **On blocker:** Status remains `in_progress` (deliberate — not `blocked`). Post a comment via `gc_add_comment` explaining what's missing or ambiguous, with concrete questions. Move on to the next eligible task instead of exiting.
+8. **On blocker:** Status remains `in_progress` (deliberate — not `blocked`). Post a comment via `gc_add_comment` explaining what's missing or ambiguous, with concrete questions. Move on to the next eligible task instead of exiting. (No mini-wrap on blockers — the work isn't done yet.)
 9. **Persist** the new cursor to `.gc-state.json` only after the iteration completes (success, blocker, or empty).
+
+## Mini-Wrap (runs before `status=done`)
+
+Subset of the `/wrap` skill — only the two phases that need to fire per-task. The full `/wrap` (commit cleanup, self-improvement, consolidation) belongs to end-of-session, not to this loop.
+
+### A. LEARNINGS.md update
+
+Ask yourself: did **this task** teach me something a future iteration would benefit from?
+
+Capture-worthy:
+- **Mistake**: a wrong turn I took (post-merge stranded commit, broken RLS policy, route.ts export rule). Future-me re-reads `LEARNINGS.md > Mistakes to Avoid` and avoids the repeat.
+- **Pattern that worked**: a non-obvious solution worth re-using (cherry-pick recovery, optimistic SWR mutation shape).
+- **Domain quirk**: project-specific behavior I had to discover (Supabase RLS gotcha, GitHub PAT scope minimum, postgres trigger ordering).
+- **Tool/environment insight**: build/deploy/typecheck quirks (`tsc` vs `next build` divergence, `.env` walk-up behavior).
+
+Skip:
+- Generic coding knowledge.
+- One-off facts that won't recur.
+- Anything already in CLAUDE.md.
+
+If you have something to capture: write the entry into the correct section of `LEARNINGS.md` (date-prefixed: `[YYYY-MM-DD]`), commit it on the **same branch** as the task work, and reference the file:line in the closing comment.
+
+If nothing is worth capturing: state it explicitly in the closing comment under `Mini-Wrap:`. Do not silently skip — the operator should see you considered it.
+
+### B. Docs / CLAUDE.md sync
+
+Did this task change anything user-visible that documentation describes?
+
+- New API endpoint, new env var, new CLI flag, new feature surface, behavioral change to existing flow → `docs/` and/or `CLAUDE.md` must reflect it.
+- Removed/renamed surface → references must be cleaned up.
+- Refactor with no behavior change → docs probably unaffected; verify and move on.
+
+Update inline on the same branch. State the outcome in the closing comment under `Mini-Wrap:` (e.g. `docs updated: docs/api.md, CLAUDE.md` or `docs up to date`).
+
+### Operating rule
+
+The mini-wrap is part of the work — not optional, not skippable, not "I'll do it in /wrap later." If you find yourself writing "I'll add this to LEARNINGS in /wrap" in a closing comment, you've already failed the rule. Do it now, on this branch, in this PR.
 
 ## Triage Rules
 
