@@ -15499,6 +15499,9 @@ var GroundControlClient = class {
   search(params) {
     return this.request("GET", `/search${this.qs(params)}`);
   }
+  semanticSearch(input) {
+    return this.request("POST", "/search/semantic", input);
+  }
   // Tasks
   listTasks(params) {
     return this.request("GET", `/tasks${this.qs(params)}`);
@@ -15511,6 +15514,9 @@ var GroundControlClient = class {
   }
   updateTask(id, input) {
     return this.request("PATCH", `/tasks/${id}`, input);
+  }
+  listComments(taskId) {
+    return this.request("GET", `/tasks/${taskId}/comments`);
   }
   createComment(taskId, body) {
     return this.request("POST", `/tasks/${taskId}/comments`, { body });
@@ -15683,14 +15689,19 @@ var taskTools = [
   },
   {
     name: "gc_get_task",
-    description: "Fetch a single task with all its details, including comments.",
+    description: "Fetch a single task with all its details, including its comments (oldest-first) under a `comments` array.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },
       required: ["id"]
     },
     async execute(input, client) {
-      return client.getTask(input.id);
+      const [taskRes, commentsRes] = await Promise.all([
+        client.getTask(input.id),
+        client.listComments(input.id)
+      ]);
+      const comments = commentsRes?.data ?? [];
+      return { ...taskRes, data: { ...taskRes?.data ?? {}, comments } };
     }
   },
   {
@@ -15783,7 +15794,11 @@ var initiativeTools = [
       properties: {
         name: { type: "string" },
         description: { type: "string" },
-        color: { type: "string", description: "Hex color (e.g. #6366F1)" }
+        color: { type: "string", description: "Hex color (e.g. #6366F1)" },
+        default_assignee: {
+          type: "string",
+          description: "tenant_members UUID. New tasks in this initiative auto-assign to this member when the caller omits assigned_to."
+        }
       },
       required: ["name"]
     },
@@ -15802,7 +15817,11 @@ var initiativeTools = [
         description: { type: "string" },
         summary: { type: "string", description: "Short status summary, 2-3 sentences" },
         memory_summary: { type: "string", description: "Agent memory digest, 3-5 sentences" },
-        color: { type: "string" }
+        color: { type: "string" },
+        default_assignee: {
+          type: "string",
+          description: "tenant_members UUID (or null to clear). Auto-assignment target for new tasks in this initiative when the caller omits assigned_to."
+        }
       },
       required: ["id"]
     },
@@ -16074,6 +16093,34 @@ var journalTools = [
   }
 ];
 
+// src/tools/search.ts
+var searchTools = [
+  {
+    name: "gc_semantic_search",
+    description: "Find past tasks, docs, and comments by semantic similarity (not just keywords). Returns the closest matches ranked by cosine similarity. Returns 503 with a clear note if the host has not provisioned OpenAI for embeddings yet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Natural-language query." },
+        types: {
+          type: "array",
+          items: { type: "string", enum: ["task", "doc", "task_comment", "doc_comment", "journal"] },
+          description: 'Optional. Restrict to these entity kinds. Omit for "all".'
+        },
+        limit: { type: "number", default: 10, description: "1\u201350. Default 10." }
+      },
+      required: ["query"]
+    },
+    async execute(input, client) {
+      return client.semanticSearch({
+        query: input.query,
+        types: input.types,
+        limit: input.limit
+      });
+    }
+  }
+];
+
 // src/tools/index.ts
 var allTools = [
   ...contextTools,
@@ -16081,7 +16128,8 @@ var allTools = [
   ...initiativeTools,
   ...objectiveTools,
   ...docTools,
-  ...journalTools
+  ...journalTools,
+  ...searchTools
 ];
 
 // src/index.ts
