@@ -3,7 +3,7 @@ description: Create a Cambuildr landing page and populate it via the AI assistan
 argument-hint: "[name]"
 ---
 
-# /cambuildr-create-landing-page
+# /cambuildr:create-landing-page
 
 End-to-end workflow: scaffold a landing page in Cambuildr, then populate its content body via the `InstructAssistant` MCP tool.
 

@@ -22,9 +22,9 @@ Talks to your tenant's `/mcp` endpoint over HTTP. **Authentication:** OAuth 2.1 
 Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capability matrix per entity type, and when to pick campaign vs triggered.
 
 ### Commands
-- `/cambuildr-init` — verify env + trigger OAuth login.
-- `/cambuildr-create-landing-page [name]` — scaffold a landing page and populate it.
-- `/cambuildr-create-mail [campaign|triggered] [name]` — scaffold an email and populate it.
+- `/cambuildr:init` — verify env + trigger OAuth login.
+- `/cambuildr:create-landing-page [name]` — scaffold a landing page and populate it.
+- `/cambuildr:create-mail [campaign|triggered] [name]` — scaffold an email and populate it.
 
 ## Installation
 
@@ -43,7 +43,7 @@ Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capabi
    ```
    Or add it to your shell rc (`~/.bashrc` / `~/.zshrc`).
 3. **Restart Claude Code** so it picks up the new env var.
-4. **Run `/cambuildr-init`.** Your browser opens the Cambuildr login page; after you log in, the MCP connects and the command reports tenant connectivity.
+4. **Run `/cambuildr:init`.** Your browser opens the Cambuildr login page; after you log in, the MCP connects and the command reports tenant connectivity.
 
 ## Tenant prerequisites
 
@@ -78,7 +78,7 @@ If you ask for a landing-page-only block inside an email, the skill will steer y
 
 - **Two-step creation.** Every `Create*` MCP tool returns an empty entity. The plugin's commands always follow up with `InstructAssistant` to fill the body. If you call the MCP tools directly, do the same.
 - **Campaign mail state.** New campaign mails sit in `EDITING`. Advancing to `READY` (which schedules the send) is a manual step in the Cambuildr admin UI.
-- **Triggers stay inactive** until you call `UpdateTrigger` with `active=true`. The `/cambuildr-create-mail triggered` command does this for you after the body is populated.
+- **Triggers stay inactive** until you call `UpdateTrigger` with `active=true`. The `/cambuildr:create-mail triggered` command does this for you after the body is populated.
 
 ## Troubleshooting
 
