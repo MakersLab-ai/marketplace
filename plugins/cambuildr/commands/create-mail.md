@@ -3,7 +3,7 @@ description: Create a Cambuildr email (campaign broadcast or automated trigger) 
 argument-hint: "[campaign|triggered] [name]"
 ---
 
-# /cambuildr-create-mail
+# /cambuildr:create-mail
 
 End-to-end workflow: scaffold a Cambuildr email (campaign or triggered) and populate its content body via `InstructAssistant`.
 

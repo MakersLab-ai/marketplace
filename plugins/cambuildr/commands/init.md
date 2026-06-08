@@ -2,7 +2,7 @@
 description: Connect Claude Code to your Cambuildr tenant and verify the MCP setup.
 ---
 
-# /cambuildr-init
+# /cambuildr:init
 
 Verify the Cambuildr MCP connection and trigger the OAuth login flow.
 
@@ -23,8 +23,8 @@ Verify the Cambuildr MCP connection and trigger the OAuth login flow.
    - Connectivity OK.
    - How many target audiences are visible (just the count is fine).
    - A short menu of next steps:
-     - "Create a landing page" → `/cambuildr-create-landing-page`
-     - "Create a campaign or automated email" → `/cambuildr-create-mail`
+     - "Create a landing page" → `/cambuildr:create-landing-page`
+     - "Create a campaign or automated email" → `/cambuildr:create-mail`
      - "List existing content" → ask me to call `ListContent`
      - "Look up a supporter" → ask me to call `ReadPerson` or `ListPeople`
 
