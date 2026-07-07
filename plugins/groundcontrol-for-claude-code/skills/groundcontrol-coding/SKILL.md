@@ -5,6 +5,7 @@ tools:
   - gc_get_context
   - gc_get_changes
   - gc_search
+  - gc_semantic_search
   - gc_list_tasks
   - gc_get_task
   - gc_create_task
@@ -126,13 +127,28 @@ The mini-wrap is part of the work — not optional, not skippable, not "I'll do 
 
 If `GC_INITIATIVE_ID` is set, all `gc_list_*` calls are scoped to that initiative automatically, and new tasks/docs default to that initiative. To work outside the initiative for a one-off, pass `initiative_id` explicitly.
 
+**Visibility:** a task/doc created **without** an initiative is *personal* — visible to you, your **responsible user** (the human configured for your agent), and the task's assignee. You also see tasks **assigned to you** even without an initiative. Attach a (visible) `initiative_id` when the work belongs to a project others should see; an invisible id is rejected with `400 initiative_not_visible`. Private initiatives appear in `gc_list_initiatives` only if you are a member (`content_visible: true`).
+
+**Watch for `warnings` in write responses:** assigning or @-mentioning a member does NOT grant them access. If they can't see the item, the write succeeds but returns `warnings: [{ code: "member_cannot_see", … }]` — react to it (move the item into a shared initiative, ask for membership, or pick someone else) instead of assuming they were notified.
+
+**Cache the initiative list in your memory** (e.g. MEMORY.md / LEARNINGS.md): store `id`, `name`, and `visibility` per initiative so you don't re-fetch `gc_list_initiatives` every iteration. Refresh the cached list only when (a) the initiative you need isn't in it, or (b) a create fails with `initiative_not_visible` — that means your memberships or the workspace changed.
+
+## GROUNDCONTROL as Memory
+
+You have no persistent context between iterations — GROUNDCONTROL does. Every task, doc, comment, and journal entry is indexed and searchable. **Before assuming the codebase is the only source of truth, search the memory layer.**
+
+- **`gc_semantic_search(query="…")`** — embedding-based recall over tasks, docs, comments, journal. Use it when you want to know whether *anything related* to a topic exists, even if the exact wording differs. Natural-language queries. First-line memory lookup when picking up an unfamiliar task: search for the task title, the affected feature name, or the error symptom — you'll often find a prior decision, doc, or comment that changes how you should approach it. Returns 503 if the host hasn't provisioned OpenAI for embeddings.
+- **`gc_search(q="…")`** — keyword (ILIKE) search. Faster for exact-string lookups (a known title, a file path, a config key).
+- **`gc_get_initiative_memory(initiative_id="…")`** — the initiative's auto-generated knowledge summary, key decisions, and recent insights. Read it at iteration start if the task lives in an initiative you haven't touched recently.
+
+Persist what you learn. Long-form research and decisions belong in **GC Docs** (`gc_create_doc`) — link from the closing comment. Today's progress belongs in **task comments**. LEARNINGS.md is for codebase-level lessons (see Mini-Wrap §A); GC Docs are for project-level memory.
+
 ## Auxiliary Tool Usage
 
 The full GROUNDCONTROL surface is available, but tasks are the main driver. Use the rest sparingly:
 
 - **Docs** (`gc_create_doc`, `gc_update_doc`): When a task involves research or produces longer-form output that doesn't fit in a comment. Link the doc URL from the closing comment: `https://groundcontrol.makerslab.ai/docs/<id>`.
 - **OKRs** (`gc_update_key_result`): If a completed task moves a known KR, update the `current_value`. Don't fabricate KR connections — only update when the task is explicitly tagged.
-- **Initiative memory** (`gc_get_initiative_memory`): Read at iteration start if you're picking up a task in an unfamiliar initiative — the memory layer surfaces past decisions and recent insights.
 - **Journal** (`gc_save_journal_summary`): Optional, end-of-day reflection. Not part of the loop iteration.
 
 ## State File: `.gc-state.json`
