@@ -15461,9 +15461,11 @@ function redactKey(input) {
 var GroundControlClient = class {
   baseUrl;
   apiKey;
+  sessionId;
   constructor(config2) {
     this.baseUrl = config2.apiUrl.replace(/\/$/, "");
     this.apiKey = config2.apiKey;
+    this.sessionId = config2.sessionId;
   }
   async request(method, path, body) {
     const url = `${this.baseUrl}${path}`;
@@ -15471,7 +15473,8 @@ var GroundControlClient = class {
       method,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...this.sessionId ? { "X-GC-Session-Id": this.sessionId } : {}
       },
       body: body ? JSON.stringify(body) : void 0
     });
@@ -15706,7 +15709,7 @@ var taskTools = [
   },
   {
     name: "gc_create_task",
-    description: "Create a new task. Defaults to your initiative if GC_INITIATIVE_ID is set.",
+    description: "Create a new task. Defaults to your initiative if GC_INITIATIVE_ID is set. Without an initiative the task is personal \u2014 visible only to you and your responsible user; set a (visible) initiative_id to share it with that initiative.",
     inputSchema: {
       type: "object",
       properties: {
@@ -15714,7 +15717,7 @@ var taskTools = [
         description: { type: "string" },
         status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"], default: "todo" },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"], default: "medium" },
-        initiative_id: { type: "string" },
+        initiative_id: { type: "string", description: "Initiative UUID (optional; must be visible to you \u2014 omit for a personal task shared only with your responsible user)" },
         assigned_to: { type: "string", description: 'tenant_member UUID, or "me"' },
         due_date: { type: "string", description: "ISO date YYYY-MM-DD" }
       },
@@ -15768,7 +15771,7 @@ var taskTools = [
 var initiativeTools = [
   {
     name: "gc_list_initiatives",
-    description: "List all initiatives (project containers) in the workspace.",
+    description: "List initiatives (project containers) visible to you. Private initiatives appear only if you are a member; content_visible tells you whether you may access their tasks/docs.",
     inputSchema: { type: "object", properties: {}, required: [] },
     async execute(_input, client) {
       return client.listInitiatives();
@@ -15795,6 +15798,11 @@ var initiativeTools = [
         name: { type: "string" },
         description: { type: "string" },
         color: { type: "string", description: "Hex color (e.g. #6366F1)" },
+        visibility: {
+          type: "string",
+          enum: ["public", "private"],
+          description: "public (default) = whole workspace. private = contents visible only to explicitly assigned members; the creator is added automatically."
+        },
         default_assignee: {
           type: "string",
           description: "tenant_members UUID. New tasks in this initiative auto-assign to this member when the caller omits assigned_to."
@@ -15818,6 +15826,11 @@ var initiativeTools = [
         summary: { type: "string", description: "Short status summary, 2-3 sentences" },
         memory_summary: { type: "string", description: "Agent memory digest, 3-5 sentences" },
         color: { type: "string" },
+        visibility: {
+          type: "string",
+          enum: ["public", "private"],
+          description: "Switch visibility. Only the initiative creator and workspace owners/admins may change this."
+        },
         default_assignee: {
           type: "string",
           description: "tenant_members UUID (or null to clear). Auto-assignment target for new tasks in this initiative when the caller omits assigned_to."
@@ -15982,7 +15995,7 @@ var docTools = [
   },
   {
     name: "gc_create_doc",
-    description: "Create a Markdown document. Always associate with an initiative.",
+    description: "Create a Markdown document. Without an initiative the doc is personal \u2014 visible only to you and your responsible user; set a (visible) initiative_id to share it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -16138,7 +16151,8 @@ function getConfig() {
   const apiKey = process.env.GC_API_KEY ?? "";
   const apiUrl = process.env.GC_API_URL || "https://groundcontrol.makerslab.ai/api/v1";
   const initiativeId = process.env.GC_INITIATIVE_ID || void 0;
-  return { apiKey, apiUrl, initiativeId };
+  const sessionId = process.env.GC_SESSION_ID || void 0;
+  return { apiKey, apiUrl, initiativeId, sessionId };
 }
 async function main() {
   const server = new Server(
@@ -16164,7 +16178,7 @@ async function main() {
         isError: true
       };
     }
-    const client = new GroundControlClient({ apiUrl: config2.apiUrl, apiKey: config2.apiKey });
+    const client = new GroundControlClient({ apiUrl: config2.apiUrl, apiKey: config2.apiKey, sessionId: config2.sessionId });
     const env = { initiativeId: config2.initiativeId };
     try {
       const result = await tool.execute(req.params.arguments ?? {}, client, env);
