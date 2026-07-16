@@ -36,14 +36,8 @@ Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capabi
 ## Setup
 
 1. **Find your tenant URL.** It's your Cambuildr admin URL with `/mcp` appended, e.g. `https://your-tenant.cambuildr.com/mcp`.
-2. **Export it as `CAMBUILDR_MCP_URL`.** [direnv](https://direnv.net/) is recommended so the variable is scoped to the project:
-   ```bash
-   # .envrc
-   export CAMBUILDR_MCP_URL="https://your-tenant.cambuildr.com/mcp"
-   ```
-   Or add it to your shell rc (`~/.bashrc` / `~/.zshrc`).
-3. **Restart Claude Code** so it picks up the new env var.
-4. **Run `/cambuildr:init`.** Your browser opens the Cambuildr login page; after you log in, the MCP connects and the command reports tenant connectivity.
+2. **Enter it when prompted.** On install/enable, the plugin asks for your **Cambuildr MCP URL** (declared via `userConfig`). Paste your tenant URL from step 1. The value is stored per user, so each customer connects to their own tenant without editing any files. To change it later, re-configure the plugin (`/plugin` → cambuildr → configure).
+3. **Run `/cambuildr:init`.** Your browser opens the Cambuildr login page; after you log in, the MCP connects and the command reports tenant connectivity.
 
 ## Tenant prerequisites
 
@@ -82,7 +76,7 @@ If you ask for a landing-page-only block inside an email, the skill will steer y
 
 ## Troubleshooting
 
-- **"`CAMBUILDR_MCP_URL` not set."** Export the env var (see Setup) and restart Claude Code.
+- **MCP tools missing / server not connected.** The Cambuildr MCP URL wasn't set. Re-configure the plugin (`/plugin` → cambuildr → configure) and enter your `https://your-tenant.cambuildr.com/mcp` URL, then restart Claude Code.
 - **No browser opened on first MCP call.** Restart Claude Code so it re-reads `.mcp.json`.
 - **"Tool not enabled for this tenant."** Your Cambuildr admin needs to toggle the tool on at `/admin/settings/mcp`.
 - **"Feature `ai_mcp_server` not available."** The feature flag must be turned on for your tenant.

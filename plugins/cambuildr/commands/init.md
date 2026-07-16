@@ -8,14 +8,11 @@ Verify the Cambuildr MCP connection and trigger the OAuth login flow.
 
 ## Steps
 
-1. **Check that the `cambuildr` MCP server is connected.** If it's not (e.g. tools are unavailable), report this back: the `CAMBUILDR_MCP_URL` env var is likely missing or wasn't picked up. Give the user this snippet and stop:
+1. **Check that the `cambuildr` MCP server is connected.** If it's not (e.g. tools are unavailable), report this back: the plugin's **Cambuildr MCP URL** (`userConfig` value `mcp_url`) is likely missing or wasn't picked up. Tell the user to configure it and stop:
 
-   ```bash
-   # ~/.envrc (with direnv) or your shell rc
-   export CAMBUILDR_MCP_URL="https://your-tenant.cambuildr.com/mcp"
-   ```
+   > Re-configure the plugin (`/plugin` → cambuildr → configure) and enter your tenant URL, e.g. `https://your-tenant.cambuildr.com/mcp`.
 
-   …and tell them to restart Claude Code so it re-reads `.mcp.json`.
+   …then tell them to restart Claude Code so it re-reads `.mcp.json`.
 
 2. **Call `ListTargetAudiences`** with no arguments. This is a lightweight read tool that will trigger the OAuth browser login on the very first call. Tell the user "a browser tab is about to open for Cambuildr login" before you make the call.
 

@@ -2,7 +2,7 @@
   "mcpServers": {
     "cambuildr": {
       "type": "http",
-      "url": "${CAMBUILDR_MCP_URL:-https://your-tenant.cambuildr.com/mcp}"
+      "url": "${user_config.mcp_url}"
     }
   }
 }
