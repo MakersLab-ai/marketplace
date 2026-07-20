@@ -15,14 +15,15 @@ Campaign emails and triggered emails are different things in Cambuildr:
 
 ## Components
 
-### MCP server: `cambuildr` (remote HTTP)
-Talks to your tenant's `/mcp` endpoint over HTTP. **Authentication:** OAuth 2.1 (RFC 8414 discovery). On first MCP call Claude Code opens your browser, you log into Cambuildr, and you're connected — no API key in config.
+### MCP connector: `cambuildr` (remote HTTP)
+Talks to your tenant's `/mcp` endpoint over HTTP. Because each tenant has its own URL, the connector is **not bundled** — you add it once with `/cambuildr:connect` (see Setup), which auto-configures it in Claude Code and guides you through it in the Claude apps (Cowork / Desktop / web). **Authentication:** OAuth 2.1 (RFC 8414 discovery). On the first tool call your browser opens, you log into Cambuildr, and you're connected — no API key in config.
 
 ### Skill: `cambuildr`
 Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capability matrix per entity type, and when to pick campaign vs triggered.
 
 ### Commands
-- `/cambuildr:init` — verify env + trigger OAuth login.
+- `/cambuildr:connect` — add the connector for your tenant (auto in Claude Code, guided in the apps) and verify it.
+- `/cambuildr:init` — verify an existing connection and show next steps.
 - `/cambuildr:create-landing-page [name]` — scaffold a landing page and populate it.
 - `/cambuildr:create-mail [campaign|triggered] [name]` — scaffold an email and populate it.
 
@@ -33,17 +34,18 @@ Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capabi
 /plugin install cambuildr@makerslab-ai
 ```
 
+Then run `/cambuildr:connect` to add the connector for your tenant.
+
 ## Setup
 
-1. **Find your tenant URL.** It's your Cambuildr admin URL with `/mcp` appended, e.g. `https://your-tenant.cambuildr.com/mcp`.
-2. **Export it as `CAMBUILDR_MCP_URL`.** [direnv](https://direnv.net/) is recommended so the variable is scoped to the project:
-   ```bash
-   # .envrc
-   export CAMBUILDR_MCP_URL="https://your-tenant.cambuildr.com/mcp"
-   ```
-   Or add it to your shell rc (`~/.bashrc` / `~/.zshrc`).
-3. **Restart Claude Code** so it picks up the new env var.
-4. **Run `/cambuildr:init`.** Your browser opens the Cambuildr login page; after you log in, the MCP connects and the command reports tenant connectivity.
+Run **`/cambuildr:connect`** and give it your tenant when asked — a bare slug (`acme`), a host (`acme.cambuildr.com`), or a full URL all work; it normalizes to `https://<tenant>.cambuildr.com/mcp`. What happens next depends on where you're running:
+
+- **Claude Code (CLI):** the command adds the connector for you (`claude mcp add --transport http cambuildr <url> --scope user`) and verifies it. No env vars, no restart dance.
+- **Claude apps (Cowork / Desktop / web):** connectors can only be added in Settings, so the command hands you the exact steps and your ready-to-paste URL — **Settings → Connectors → Add custom connector**, name it `cambuildr`, paste the URL, leave OAuth fields blank, then **Connect**.
+
+Either way, on the first tool call your browser opens the Cambuildr login; after you log in you're connected. Later, `/cambuildr:init` just re-verifies and shows what you can do next.
+
+> **Why not bundled?** Every Cambuildr tenant has its own URL, and a plugin-bundled remote connector installs with one fixed URL and no way to edit it in the apps. Adding it per-tenant via `/cambuildr:connect` is what makes the plugin work in Cowork/Desktop, not just the CLI.
 
 ## Tenant prerequisites
 
@@ -82,8 +84,9 @@ If you ask for a landing-page-only block inside an email, the skill will steer y
 
 ## Troubleshooting
 
-- **"`CAMBUILDR_MCP_URL` not set."** Export the env var (see Setup) and restart Claude Code.
-- **No browser opened on first MCP call.** Restart Claude Code so it re-reads `.mcp.json`.
+- **`cambuildr` tools aren't available.** The connector isn't set up yet — run `/cambuildr:connect`.
+- **Connected to the wrong tenant.** Re-run `/cambuildr:connect`; in Claude Code remove the old server first with `claude mcp remove cambuildr`, in the apps delete the connector in Settings.
+- **No browser opened on first tool call.** In Claude Code, restart so it re-reads the MCP config; in a Claude app, re-open the connector in Settings and click **Connect**.
 - **"Tool not enabled for this tenant."** Your Cambuildr admin needs to toggle the tool on at `/admin/settings/mcp`.
 - **"Feature `ai_mcp_server` not available."** The feature flag must be turned on for your tenant.
 - **My trigger isn't firing.** Check `GetTrigger` returns `active: true`. If not, `UpdateTrigger` with `active=true` after populating the body.
