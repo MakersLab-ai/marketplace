@@ -1,17 +1,9 @@
 {
   "name": "cambuildr",
   "description": "Manage Cambuildr campaigns, landing pages, automated emails, target audiences, and supporters from Claude Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "AI Makers Lab"
-  },
-  "userConfig": {
-    "mcp_url": {
-      "type": "string",
-      "title": "Cambuildr MCP URL",
-      "description": "Your Cambuildr admin URL with /mcp appended, e.g. https://your-tenant.cambuildr.com/mcp",
-      "required": true
-    }
   },
   "keywords": [
     "cambuildr",
