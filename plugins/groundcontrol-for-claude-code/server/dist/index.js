@@ -15452,12 +15452,41 @@ var StdioServerTransport = class {
   }
 };
 
+// src/client.ts
+var import_promises = require("node:fs/promises");
+var import_node_path = require("node:path");
+
 // src/redact.ts
 function redactKey(input) {
   return input.replace(/gc_live_[A-Za-z0-9_-]+/g, "gc_live_<redacted>");
 }
 
 // src/client.ts
+var MIME_BY_EXT = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".csv": "text/csv",
+  ".json": "application/json",
+  ".yaml": "application/yaml",
+  ".yml": "application/yaml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".zip": "application/zip"
+};
+function contentTypeFor(fileName) {
+  return MIME_BY_EXT[(0, import_node_path.extname)(fileName).toLowerCase()] ?? "application/octet-stream";
+}
 var GroundControlClient = class {
   baseUrl;
   apiKey;
@@ -15478,6 +15507,23 @@ var GroundControlClient = class {
       },
       body: body ? JSON.stringify(body) : void 0
     });
+    return this.handle(res);
+  }
+  // Multipart sibling of request(). Deliberately does NOT set Content-Type:
+  // fetch has to generate the multipart boundary itself, and pinning the header
+  // would produce a body the server can't parse.
+  async requestForm(method, path, form) {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        ...this.sessionId ? { "X-GC-Session-Id": this.sessionId } : {}
+      },
+      body: form
+    });
+    return this.handle(res);
+  }
+  async handle(res) {
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({ error: { code: "unknown", message: res.statusText } }));
       const message = errBody.error?.message || res.statusText;
@@ -15523,6 +15569,18 @@ var GroundControlClient = class {
   }
   createComment(taskId, body) {
     return this.request("POST", `/tasks/${taskId}/comments`, { body });
+  }
+  listAttachments(taskId) {
+    return this.request("GET", `/tasks/${taskId}/attachments`);
+  }
+  // Reads a local file and posts it as multipart/form-data. The API caps
+  // uploads at 50 MB and accepts any file type.
+  async uploadAttachment(taskId, filePath, fileName) {
+    const bytes = await (0, import_promises.readFile)(filePath);
+    const name = fileName || (0, import_node_path.basename)(filePath);
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: contentTypeFor(name) }), name);
+    return this.requestForm("POST", `/tasks/${taskId}/attachments`, form);
   }
   // Initiatives
   listInitiatives() {
@@ -15589,14 +15647,14 @@ var GroundControlClient = class {
 
 // src/dotenv.ts
 var import_node_fs = require("node:fs");
-var import_node_path = require("node:path");
+var import_node_path2 = require("node:path");
 function findDotenv(startDir, home = process.env.HOME ?? "") {
-  let dir = (0, import_node_path.resolve)(startDir);
+  let dir = (0, import_node_path2.resolve)(startDir);
   while (true) {
     if (home && dir === home) return null;
-    const candidate = (0, import_node_path.resolve)(dir, ".env");
+    const candidate = (0, import_node_path2.resolve)(dir, ".env");
     if ((0, import_node_fs.existsSync)(candidate)) return candidate;
-    const parent = (0, import_node_path.dirname)(dir);
+    const parent = (0, import_node_path2.dirname)(dir);
     if (parent === dir) return null;
     dir = parent;
   }
@@ -15692,19 +15750,37 @@ var taskTools = [
   },
   {
     name: "gc_get_task",
-    description: "Fetch a single task with all its details, including its comments (oldest-first) under a `comments` array.",
+    description: "Fetch a single task with all its details, including its comments (oldest-first) under a `comments` array and any file attachments under an `attachments` array. Each attachment carries a short-lived signed `file_url` you can download directly (e.g. curl/wget) while it is valid, plus `file_name`, `file_size`, and `content_type`.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },
       required: ["id"]
     },
     async execute(input, client) {
-      const [taskRes, commentsRes] = await Promise.all([
+      const [taskRes, commentsRes, attachmentsRes] = await Promise.all([
         client.getTask(input.id),
-        client.listComments(input.id)
+        client.listComments(input.id),
+        client.listAttachments(input.id)
       ]);
       const comments = commentsRes?.data ?? [];
-      return { ...taskRes, data: { ...taskRes?.data ?? {}, comments } };
+      const attachments = attachmentsRes?.data ?? [];
+      return { ...taskRes, data: { ...taskRes?.data ?? {}, comments, attachments } };
+    }
+  },
+  {
+    name: "gc_upload_attachment",
+    description: "Attach a local file to a task (PDF, Word, images, logs, screenshots \u2014 any type, up to 50 MB). Give the path of a file that already exists on disk; write your content to a file first if you generated it. Returns the created attachment including a short-lived signed `file_url`. Humans see it in the task's Attachments section.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string" },
+        file_path: { type: "string", description: "Absolute (or cwd-relative) path to the local file to upload" },
+        file_name: { type: "string", description: "Optional name to store it under; defaults to the file's own name" }
+      },
+      required: ["task_id", "file_path"]
+    },
+    async execute(input, client) {
+      return client.uploadAttachment(input.task_id, input.file_path, input.file_name);
     }
   },
   {

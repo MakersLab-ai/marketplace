@@ -11,6 +11,7 @@ tools:
   - gc_create_task
   - gc_update_task
   - gc_add_comment
+  - gc_upload_attachment
   - gc_list_initiatives
   - gc_get_initiative
   - gc_create_initiative
@@ -38,13 +39,13 @@ You are running as a coding agent inside a developer's Claude Code session. Your
 
 ## Loop Iteration Recipe (`/gc-check`)
 
-1. **Read cursor** from `.gc-state.json` in the project root. If absent, use `now() - 24h`.
+1. **Read cursor** from `.gc-state.json` in the project root. If absent, use `now() - 24h`. **Immediately capture `startedAt = now()`** (before any `gc_get_changes` call) — this is the value you persist as the *new* cursor at the end of the iteration. Never advance the cursor to the wall-clock time *after* processing: an iteration can run for many minutes (implementing a task, opening a PR), and any comment that lands during that window would otherwise be skipped forever by the endpoint's strict `since >` filter.
 2. **Get changes:** `gc_get_changes(since=<cursor>)`. For each new comment on a task assigned to you, read it. Reply with `gc_add_comment` if the comment asks a question or requests a change you can act on. If a change unblocks a task that you previously left in `in_progress` with a blocker comment, resume it.
 3. **Pick a task:** `gc_list_tasks(assigned_to: "me")`. If `GC_INITIATIVE_ID` is set, that filter is applied automatically. Pick order:
    - First: any task with `status: in_progress` (resume what you started).
    - Then: `status: todo` sorted by priority `critical > high > medium > low`, ties broken by earlier `due_date`.
    - Skip: tasks assigned to anyone other than you.
-4. **Nothing to do?** Update `.gc-state.json` with `now()`, exit cleanly.
+4. **Nothing to do?** Update `.gc-state.json` with `startedAt` (the timestamp captured in step 1, **not** a fresh `now()`), exit cleanly.
 5. **Has work?** Set `status: in_progress` via `gc_update_task` (if not already). Implement the task.
 6. **Branching and commits:**
    - Branch name: `gc/task-<id>-<slug>`. The slug is the task title kebab-cased, max 40 chars.
@@ -78,7 +79,7 @@ You are running as a coding agent inside a developer's Claude Code session. Your
      ```
    - `gc_update_task(id, status: "done")`.
 8. **On blocker:** Status remains `in_progress` (deliberate — not `blocked`). Post a comment via `gc_add_comment` explaining what's missing or ambiguous, with concrete questions. Move on to the next eligible task instead of exiting. (No mini-wrap on blockers — the work isn't done yet.)
-9. **Persist** the new cursor to `.gc-state.json` only after the iteration completes (success, blocker, or empty).
+9. **Persist** the cursor to `.gc-state.json` only after the iteration completes (success, blocker, or empty) — writing **`startedAt`** (captured in step 1, *before* `gc_get_changes`), never a fresh `now()`. Using the start-of-iteration timestamp guarantees comments that arrived *during* the run are picked up next iteration; writing it at the *end* (rather than eagerly at the start) keeps it crash-safe — an aborted iteration leaves the old cursor untouched, so the batch is simply re-fetched next time (the agent's branch/PR/comment actions are idempotent).
 
 ## Mini-Wrap (runs before `status=done`)
 
@@ -159,7 +160,7 @@ Lives in the project root, gitignored. Created by `/gc-init`.
 { "lastCheck": "2026-05-08T13:45:00Z" }
 ```
 
-Update at the end of every iteration, regardless of outcome.
+Written at the end of every iteration, regardless of outcome — but the **value** is `startedAt`, the timestamp captured at the *start* of the iteration (before `gc_get_changes`), not the time the iteration finished. This closes the gap where comments arriving during a long (multi-minute) iteration would be skipped by the strict `since >` window. (A fully clock-skew-proof cursor would come from a server-side `next_cursor` on `/api/v1/changes`; until that exists, the start-of-iteration client timestamp is the safe approximation.)
 
 ## Forbidden
 
