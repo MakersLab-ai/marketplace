@@ -37,7 +37,7 @@ Das war's. Auto-Updates laufen ab jetzt bei jedem Start von Claude Code.
 | Plugin | Version | Beschreibung |
 |--------|:-------:|--------------|
 | [**`destillar`**](./plugins/destillar) | `0.5.0` | Zugriff auf Philipp Maderthaners Wissensgraph über Destillar — für Wissensabfragen und Content-Erstellung |
-| [**`groundcontrol-for-claude-code`**](./plugins/groundcontrol-for-claude-code) | `0.1.7` | Claude-Code-Session als autonomer Coding-Agent auf GROUNDCONTROL-Tasks — pickt Tasks, implementiert, öffnet PRs |
+| [**`groundcontrol-for-claude-code`**](./plugins/groundcontrol-for-claude-code) | `0.1.9` | Claude-Code-Session als autonomer Coding-Agent auf GROUNDCONTROL-Tasks — pickt Tasks, implementiert, öffnet PRs |
 | [**`cambuildr`**](./plugins/cambuildr) | `0.3.0` | Cambuildr-Tenant aus Claude Code steuern — Landing Pages, Kampagnen-Mails, Automated Emails, Zielgruppen, Supporter |
 
 > Mehr Plugins folgen. PRs willkommen.
