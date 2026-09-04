@@ -91,23 +91,22 @@ Auto-Updates laufen bei jedem Start von Claude Code automatisch, solange das Rep
 2. Bei relevanten Änderungen die `version` erhöhen — in **beiden** Dateien:
    `plugins/<name>/.claude-plugin/plugin.json` und `.claude-plugin/marketplace.json`
    — Claude Code erkennt Updates **nur** über eine neue Versionsnummer
-3. Tags und Releases entstehen automatisch beim Push auf `main` — siehe Release-Contract
 
-### Release-Contract
+Das gilt für `destillar` und `groundcontrol-for-claude-code`. **`cambuildr` wird nicht hier gepflegt** — siehe unten.
 
-Zwei Workflows setzen das durch, nichts davon passiert von Hand:
+### Versions-Parity
 
 | Workflow | Trigger | Was er tut |
 |---|---|---|
 | `.github/workflows/plugin-version-check.yml` | Pull Request | Schlägt fehl, wenn die `version` eines Plugins in `.claude-plugin/marketplace.json` nicht der in `plugins/<name>/.claude-plugin/plugin.json` entspricht. |
-| `.github/workflows/release-plugin.yml` | Push auf `main` | Legt für jedes Plugin, dessen `plugin.json`-Version sich geändert hat, den Tag `<plugin>-v<version>` und ein GitHub Release an. |
 
-Zwei Regeln, die daraus folgen:
+Ein Mismatch ist zur Laufzeit unsichtbar: Claude Code liest den Katalogeintrag und das installierte Manifest getrennt, und ein Release erreicht die User schlicht nicht. Der Check macht daraus einen roten PR statt eines stillen Nicht-Updates — `destillar` hatte gar keine `version`, genau dieser Fall.
 
-- **Beide Versionsnummern immer gemeinsam erhöhen.** Ein Mismatch ist zur Laufzeit unsichtbar — Claude Code liest den Katalogeintrag und das installierte Manifest getrennt, und ein Release erreicht die User schlicht nicht. Der Parity-Check macht daraus einen roten PR statt eines stillen Nicht-Updates.
-- **Das `cambuildr`-Plugin wird generiert, nicht hier gepflegt.** Seine Quelle ist `resources/mcp-plugin/` im Applikations-Repo, damit es im selben Pull Request wie der MCP-Server geändert wird, den es beschreibt, und nicht von ihm abweichen kann. Ein Release-Job dort pusht diese Kopie hierher; Änderungen direkt in `plugins/cambuildr/` werden beim nächsten Release überschrieben. Tenants bekommen ihre eigene, vorkonfigurierte Kopie direkt aus der Applikation — dieser Katalog ist der öffentliche Discovery-Kanal, keine Distributions-Abhängigkeit.
+### `cambuildr` wird generiert
 
-Manuelles Tag-Setzen ist damit nur noch nötig, wenn User sich per `ref` auf einen bestimmten Stand pinnen sollen.
+Seine Quelle ist `resources/mcp-plugin/` im Applikations-Repo, damit es im selben Pull Request wie der MCP-Server geändert wird, den es beschreibt, und nicht von ihm abweichen kann. Ein Job dort pusht diese Kopie hierher; Änderungen direkt in `plugins/cambuildr/` werden beim nächsten Release überschrieben.
+
+Tenants bekommen ihre eigene, vorkonfigurierte Kopie direkt aus der Applikation — dieser Katalog ist der öffentliche Discovery-Kanal, keine Distributions-Abhängigkeit.
 
 > 💡 **Release-Channels:** Für getrennte `stable`/`beta`-Kanäle einen zweiten Marketplace-Eintrag mit anderem `ref` einrichten ([Doku](https://code.claude.com/docs/en/plugin-marketplaces#set-up-release-channels)).
 
@@ -120,10 +119,9 @@ Manuelles Tag-Setzen ist damit nur noch nötig, wenn User sich per `ref` auf ein
 ├── .claude-plugin/
 │   └── marketplace.json                    # Plugin-Katalog
 ├── .github/
-│   ├── scripts/                            # Prüf-/Release-Skripte der Workflows
+│   ├── scripts/check_plugin_versions.py    # Prüfskript des Workflows
 │   └── workflows/
-│       ├── plugin-version-check.yml        # PR-Gate: Katalog- vs. Plugin-Version
-│       └── release-plugin.yml              # Push auf main: Tag <plugin>-v<version> + Release
+│       └── plugin-version-check.yml        # PR-Gate: Katalog- vs. Plugin-Version
 └── plugins/
     ├── destillar/                          # → plugins/destillar/README.md
     │   ├── .claude-plugin/plugin.json
