@@ -43,8 +43,8 @@
     {
       "name": "cambuildr",
       "source": "./plugins/cambuildr",
-      "description": "Manage Cambuildr campaigns, landing pages, automated emails, target audiences, and supporters from Claude Code.",
-      "version": "0.3.0",
+      "description": "Manage Cambuildr landing pages, campaign and automated emails, workflows, target audiences, supporters and media from Claude Code.",
+      "version": "0.4.0",
       "author": {
         "name": "AI Makers Lab"
       },
@@ -55,8 +55,9 @@
         "campaigns",
         "landing-pages",
         "email-marketing",
-        "non-profit",
-        "automation"
+        "workflows",
+        "automation",
+        "non-profit"
       ]
     }
   ]

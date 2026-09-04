@@ -1,92 +1,162 @@
+<!--
+  GENERATED — do not edit here.
+
+  The source of truth for this plugin is resources/mcp-plugin/ in the private
+  MakersLab-ai/cambuildr repository, so it changes in the same pull request as
+  the MCP server it documents and cannot drift from it. A release job in that
+  repository publishes this copy; edits made here are overwritten.
+-->
+
 # Cambuildr Plugin
 
-Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campaign emails, automated (triggered) emails, target audiences, and supporters — directly from Claude Code.
+Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campaign emails, automated (triggered) emails, workflows, target audiences, tags, the media library and supporters — directly from Claude.
 
 ## What this plugin does
 
-- **Read**: list and inspect landing pages, campaign mails, triggered mails, target audiences, and people records.
-- **Write**: create and update landing pages, campaign mails, triggered mails, and target audiences. Bind audiences and tags. Toggle triggers active/inactive. Configure trigger delays.
-- **AI content**: fill the body of any landing page, campaign mail, or triggered mail with natural-language instructions via `InstructAssistant`. The plugin's commands always follow `Create*` with `InstructAssistant` so you never end up with an empty entity.
+- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records.
+- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items.
+- **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity.
 
-Campaign emails and triggered emails are different things in Cambuildr:
+Three things in Cambuildr are easy to confuse:
 
 - **Campaign mail** ("Campaign Emails" in the admin UI) — a scheduled broadcast to a target audience.
-- **Triggered mail** ("Automated Emails" in the admin UI) — an event-driven automation, bound to an action (signup, donation, birthday, …) with optional delay.
+- **Triggered mail** ("Automated Emails") — one email sent when one bound event fires, with an optional delay.
+- **Workflow** ("Automations") — a multi-step graph: send, tag, wait, branch, call a webhook.
 
-## Components
+## Tool names are kebab-case
 
-### MCP connector: `cambuildr` (remote HTTP)
-Talks to your tenant's `/mcp` endpoint over HTTP. Because each tenant has its own URL, the connector is **not bundled** — you add it once with `/cambuildr:connect` (see Setup), which auto-configures it in Claude Code and guides you through it in the Claude apps (Cowork / Desktop / web). **Authentication:** OAuth 2.1 (RFC 8414 discovery). On the first tool call your browser opens, you log into Cambuildr, and you're connected — no API key in config.
+The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-### Skill: `cambuildr`
-Teaches Claude the two-step create-then-`InstructAssistant` workflow, the capability matrix per entity type, and when to pick campaign vs triggered.
-
-### Commands
-- `/cambuildr:connect` — add the connector for your tenant (auto in Claude Code, guided in the apps) and verify it.
-- `/cambuildr:init` — verify an existing connection and show next steps.
-- `/cambuildr:create-landing-page [name]` — scaffold a landing page and populate it.
-- `/cambuildr:create-mail [campaign|triggered] [name]` — scaffold an email and populate it.
+The server exposes **34 tools, 5 prompts and 4 resources**.
 
 ## Installation
+
+Either path gives you the same plugin. The difference is only whether the MCP connector arrives pre-configured.
+
+### From the public marketplace
 
 ```
 /plugin marketplace add makerslab-ai/marketplace
 /plugin install cambuildr@makerslab-ai
+/cambuildr:connect
 ```
 
-Then run `/cambuildr:connect` to add the connector for your tenant.
+`/cambuildr:connect` asks for your tenant and wires up the connector — a slug (`acme`), a host, or a full URL all work. Use this if you are trying Cambuildr out, or if you would rather not go through the admin panel.
 
-## Setup
+### From your own tenant, with the connector already set up
 
-Run **`/cambuildr:connect`** and give it your tenant when asked — a bare slug (`acme`), a host (`acme.cambuildr.com`), or a full URL all work; it normalizes to `https://<tenant>.cambuildr.com/mcp`. What happens next depends on where you're running:
+Your Cambuildr admin shows a ready-made install line at **`/admin/settings/mcp`**:
 
-- **Claude Code (CLI):** the command adds the connector for you (`claude mcp add --transport http cambuildr <url> --scope user`) and verifies it. No env vars, no restart dance.
-- **Claude apps (Cowork / Desktop / web):** connectors can only be added in Settings, so the command hands you the exact steps and your ready-to-paste URL — **Settings → Connectors → Add custom connector**, name it `cambuildr`, paste the URL, leave OAuth fields blank, then **Connect**.
+```
+/plugin marketplace add https://<your-tenant>.cambuildr.com/mcp-plugin/<token>/marketplace.json
+```
 
-Either way, on the first tool call your browser opens the Cambuildr login; after you log in you're connected. Later, `/cambuildr:init` just re-verifies and shows what you can do next.
+The archive is built for your tenant, so the connector arrives with **your** `/mcp` URL already in it and there is no `/cambuildr:connect` step. Needs **Claude Code 2.1.224 or newer**, where the `archive` marketplace source type landed; on anything older, use the public path above.
 
-> **Why not bundled?** Every Cambuildr tenant has its own URL, and a plugin-bundled remote connector installs with one fixed URL and no way to edit it in the apps. Adding it per-tenant via `/cambuildr:connect` is what makes the plugin work in Cowork/Desktop, not just the CLI.
+Connecting to more than one Cambuildr tenant at once? Give each a distinct **connector name** at `/admin/settings/mcp` before you install, or their tools collide under the same `cambuildr` prefix.
+
+### Updates
+
+Both paths update through `/plugin marketplace update` then `/plugin update`. Not a silent auto-update: the catalog is re-read only when you ask.
+
+### Claude Desktop (`.mcpb`)
+
+Out of scope. The `.mcpb` bundle format is stdio-only and cannot express a remote OAuth-authenticated HTTP server, which is what the Cambuildr MCP endpoint is. Use Claude Code, or add the connector by hand in a Claude app as `/cambuildr:connect` describes.
+
+## Components
+
+### MCP connector: `cambuildr` (remote HTTP)
+
+Talks to your tenant's `/mcp` endpoint over HTTP. The tenant-built archive ships it preconfigured; the public plugin does not, so `/cambuildr:connect` adds it. **Authentication:** OAuth 2.1 (RFC 8414 discovery). On the first tool call your browser opens, you log into Cambuildr, and you are connected — no API key in any config file.
+
+The server must be named exactly `cambuildr`; the skill and the commands address it by that name.
+
+### Skill: `cambuildr`
+
+The accurate tool reference, the create-then-`instruct-assistant` rule, the capability matrix per entity type, the trigger-action binding sequence, workflows, hosted pages and the media library.
+
+### Commands
+
+- `/cambuildr:connect` — add the connector for your tenant (automatic in Claude Code, guided in the Claude apps) and verify it.
+- `/cambuildr:init` — verify an existing connection and show what you can do next.
+- `/cambuildr:create-landing-page [name]` — scaffold a landing page and populate it.
+- `/cambuildr:create-mail [campaign|triggered] [name]` — scaffold an email and populate it.
+- `/cambuildr:create-workflow [name]` — scaffold an automation, set its start condition and graph, then activate it.
+
+### Server-side prompts
+
+The same guided workflows also ship on the server as MCP prompts, so they reach any MCP client, not only ones that can install this plugin. Prefer them when one matches the request:
+
+`build-landing-page-workflow`, `build-automated-mail-workflow`, `build-target-audience-workflow`, `build-workflow-automation`, `audit-tenant-content`.
+
+### Server-side resources
+
+| Resource | URI |
+|---|---|
+| Tool catalog (authoritative wire names) | `cambuildr://tools` |
+| Tenant profile (flags, languages, base URL) | `cambuildr://tenant` |
+| Trigger action catalog | `cambuildr://trigger-actions` |
+| Workflow building blocks | `cambuildr://workflows/{workflow_id}/building-blocks` |
 
 ## Tenant prerequisites
 
-Your Cambuildr account must have:
+| Requirement | Gates |
+|---|---|
+| Feature flag `ai_mcp_server` | The MCP server itself. Without it there is no endpoint. |
+| Feature flag `ai_mcp_write_access` | Every write tool. Without it only the read tools are registered. |
+| AI opt-in for the customer | `instruct-assistant` only. Without it that one tool is **absent** while everything else works. |
+| Per-tool toggles at `/admin/settings/mcp` | Individual tools. A disabled tool is not registered. |
 
-- Feature flag `ai_mcp_server` enabled.
-- The MCP tools you want to use toggled on in `/admin/settings/mcp`.
+`instruct-assistant` also needs AI credit; an exhausted balance returns an error asking for a top-up.
 
-If you don't have access to those settings, ask your Cambuildr account admin.
+If you do not have access to those settings, ask your Cambuildr account admin.
 
-## What you can build
+## Capability matrix
 
-The AI content tool (`InstructAssistant`) supports different blocks depending on the entity type:
+`instruct-assistant` builds different blocks depending on the entity type:
 
 | Block | Landing page | Campaign mail | Triggered mail |
 |---|:---:|:---:|:---:|
-| Text, headings, images, buttons, video, dividers, lists, menus, HTML | ✅ | ✅ | ✅ |
-| **Signup form** (multi-field, opt-in, multi-step) | ✅ | ❌ | ❌ |
-| **Donation block** (preset amounts, anonymous, tax-deduction) | ✅ | ❌ | ❌ |
-| **Purchase block** (Stripe) | ✅ | ❌ | ❌ |
-| **Countdown timer** | ✅ | ❌ | ❌ |
-| **Survey — POLL** (multiple-choice) | ✅ | ✅ | ✅ |
-| **Survey — SENTIMENT / MULTI_SWIPE / VERIFIED_VOTING** | ✅ | ❌ | ❌ |
-| **Progress bar** (signups / donations / group) | ✅ | ❌ | ❌ |
-| **Event / Commitment / UGC teasers** | ✅ | ❌ | ❌ |
-| **Share buttons** (FB, X, LinkedIn, WhatsApp, Telegram, Threads, Bluesky, mail) | ✅ | ✅ | ✅ |
-| **Merge tags** `{{ var:firstname }}`, custom fields, action-specific placeholders | ❌ | ✅ | ✅ (+ action context) |
+| Text, headings, images, buttons, video, dividers, lists, menus, HTML | Yes | Yes | Yes |
+| Signup form (multi-field, opt-in, multi-step) | Yes | No | No |
+| Donation block (preset amounts, anonymous, tax-deduction) | Yes | No | No |
+| Purchase block (Stripe) | Yes | No | No |
+| Countdown timer | Yes | No | No |
+| Survey — POLL (multiple choice) | Yes | Yes | Yes |
+| Survey — SENTIMENT / MULTI_SWIPE / VERIFIED_VOTING | Yes | No | No |
+| Progress bar (signups / donations / group) | Yes | No | No |
+| Event / Commitment / UGC teasers | Yes | No | No |
+| Share buttons (mail, Facebook, X, LinkedIn, WhatsApp, Telegram, Threads, Bluesky) | Yes | Yes | Yes |
+| Merge tags `{{ var:firstname }}`, custom fields, action placeholders | No | Yes | Yes (plus action context) |
 
-If you ask for a landing-page-only block inside an email, the skill will steer you to put it on a landing page and link to it from the email.
+Ask for a landing-page-only block inside an email and the skill will steer you to put it on a landing page and link to it from the email.
+
+Two entity types have no blocks at all: a **target audience** is filter rules, and a **workflow** is a node graph. `instruct-assistant` writes both from natural language.
 
 ## Workflow notes
 
-- **Two-step creation.** Every `Create*` MCP tool returns an empty entity. The plugin's commands always follow up with `InstructAssistant` to fill the body. If you call the MCP tools directly, do the same.
-- **Campaign mail state.** New campaign mails sit in `EDITING`. Advancing to `READY` (which schedules the send) is a manual step in the Cambuildr admin UI.
-- **Triggers stay inactive** until you call `UpdateTrigger` with `active=true`. The `/cambuildr:create-mail triggered` command does this for you after the body is populated.
+- **Two-step creation.** Every `create-*` tool returns an empty entity. The commands follow up with `instruct-assistant`. If you call the tools directly, do the same.
+- **Bind triggers to internal actions.** `create-trigger` takes a name; `list-trigger-actions` gives the dotted `name.context` keys (`signed-up.campaign`, `donated.donation`, `has-birthday.database`); `set-trigger-action` binds one. A free-text action name requires an explicit `is_internal_action: false` and means an external webhook that no internal Cambuildr event fires.
+- **Target audiences start empty.** `create-target-audience` returns a group matching nobody. The `instruct-assistant` follow-up that writes its rules is mandatory, not optional.
+- **Triggered mails resolve their variant.** `instruct-assistant` no longer needs an explicit `variant_id`; the first variant is used.
+- **Workflow graphs are full replaces.** `set-workflow-graph` takes the complete node and edge lists every time. Read the current graph with `get-workflow` and edit that.
+- **A delete-person workflow cannot be self-activated.** `update-workflow active=true` on a graph containing a `delete_person` action returns a refusal saying review was requested; only Cambuildr can switch it on.
+- **Campaign mail state.** New campaign mails sit in `EDITING`. Advancing to `READY`, which schedules the send, is a manual step in the admin UI.
+- **Triggers and workflows stay inactive** until you flip `active=true`, which the commands do after the content is populated.
+- **Hosted landing pages are experimental.** They are raw-HTML pages with no editor, and none of the custom blocks apply to them. Call `get-hosted-landing-page-contract` before authoring one.
 
 ## Troubleshooting
 
-- **`cambuildr` tools aren't available.** The connector isn't set up yet — run `/cambuildr:connect`.
-- **Connected to the wrong tenant.** Re-run `/cambuildr:connect`; in Claude Code remove the old server first with `claude mcp remove cambuildr`, in the apps delete the connector in Settings.
-- **No browser opened on first tool call.** In Claude Code, restart so it re-reads the MCP config; in a Claude app, re-open the connector in Settings and click **Connect**.
-- **"Tool not enabled for this tenant."** Your Cambuildr admin needs to toggle the tool on at `/admin/settings/mcp`.
-- **"Feature `ai_mcp_server` not available."** The feature flag must be turned on for your tenant.
-- **My trigger isn't firing.** Check `GetTrigger` returns `active: true`. If not, `UpdateTrigger` with `active=true` after populating the body.
+- **No `cambuildr` tools at all.** The connector is not set up — run `/cambuildr:connect`, or install through your tenant's own marketplace URL.
+- **`/plugin marketplace add` fails on the tenant URL.** Your Claude Code is older than 2.1.224 and does not know the `archive` source type. Upgrade, or use the public marketplace plus `/cambuildr:connect`.
+- **`instruct-assistant` is missing but everything else works.** The tenant has not opted in to the AI assistant. That is a tenant setting, not a connection fault, and it removes only that one tool. Ask your Cambuildr account admin to opt in, or do the content work in the admin UI.
+- **"AI credits exhausted."** Top up the tenant's AI credit balance. Retrying does not help.
+- **Only read tools are present.** The `ai_mcp_write_access` feature flag is off for your tenant.
+- **One specific tool is missing.** It is toggled off at `/admin/settings/mcp`.
+- **"Feature `ai_mcp_server` not available."** The feature flag must be enabled for the tenant.
+- **Connected to the wrong tenant.** Re-run `/cambuildr:connect`; in Claude Code remove the old server first with `claude mcp remove cambuildr`, in a Claude app delete the connector in Settings.
+- **No browser opened on the first tool call.** In Claude Code, restart so it re-reads the MCP config; in a Claude app, re-open the connector in Settings and click **Connect**.
+- **My trigger is not firing.** Check `get-trigger`. It needs both `active: true` **and** an internal action binding. A trigger whose action came from free text is an external webhook binding and no Cambuildr event will fire it — rebind it with `set-trigger-action`.
+- **My target audience matches nobody.** It was created without rules. Run `instruct-assistant` with `entity_type: target_audience`, then re-read the count with `get-target-audience`.
+- **My workflow does nothing.** It needs a start condition (`set-workflow-start-condition`), a published graph (`set-workflow-graph`), and `active=true`.
+- **A tool name is rejected.** Names are kebab-case. Read `cambuildr://tools` for the exact spellings.

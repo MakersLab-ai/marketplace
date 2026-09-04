@@ -1,0 +1,23 @@
+name: Plugin version parity
+
+# A plugin's version lives in two places: the marketplace catalog entry and the plugin's
+# own manifest. Claude Code reads both, and only a changed number tells it an update
+# exists -- so a disagreement between the two does not error anywhere, it just means a
+# release never reaches the people who have the plugin installed. Caught here instead.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  versions-match:
+    name: marketplace.json matches every plugin.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare catalog and manifest versions
+        run: python3 .github/scripts/check_plugin_versions.py
