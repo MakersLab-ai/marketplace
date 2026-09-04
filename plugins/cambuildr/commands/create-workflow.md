@@ -95,7 +95,7 @@ set-workflow-graph(id=<workflow id>, nodes=[…], edges=[…])
 Rules that matter:
 - **Full replace, never a diff.** Send every node and every edge each time, including the ones you are not changing. Base your write on what `get-workflow` returned.
 - Node kinds are `START`, `ACTION`, `CONDITION`, `WAIT`. Exactly one `START` node.
-- Only `CONDITION` nodes may have more than one outgoing edge; their out-edges branch on `yes` / `no` with a mandatory `else` fallback.
+- Only `CONDITION` nodes may have more than one outgoing edge; their out-edges are labelled `branch: "yes"` and/or `branch: "no"`, at most one of each and no other value. There is no `else` branch: leave a branch unwired and the run simply ends on that side. An edge that does not leave a `CONDITION` carries no branch.
 - A wait is either a duration or an absolute date.
 - Webhook URLs must be HTTPS on port 443 and resolve to a public address. A secret webhook header value comes back from `get-workflow` as a sentinel placeholder — send it back **unchanged** to keep the stored credential; anything else overwrites it.
 - An invalid graph is rejected with error codes and nothing is saved. Fix and resend the whole graph.

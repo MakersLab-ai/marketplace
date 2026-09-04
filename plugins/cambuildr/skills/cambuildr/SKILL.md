@@ -227,7 +227,7 @@ A workflow is a multi-step automation: one enrolling event, then a graph of acti
 `set-workflow-graph` replaces the graph with what you send. It is never a diff. Always send **every** node and **every** edge, including the ones you are not changing. Read the current graph with `get-workflow` first and edit that.
 
 - Node kinds: `START`, `ACTION`, `CONDITION`, `WAIT`. Exactly one `START` node is required.
-- Only `CONDITION` nodes may have more than one outgoing edge; their out-edges branch on `yes` / `no` with a mandatory `else` fallback.
+- Only `CONDITION` nodes may have more than one outgoing edge; their out-edges are labelled `branch: "yes"` and/or `branch: "no"`, at most one of each and no other value. There is no `else` branch: leave a branch unwired and the run simply ends on that side. An edge that does not leave a `CONDITION` carries no branch.
 - Action types cover sending an automated mail, attaching a tag, adding to a campaign, writing person data, updating person state, adding an action to a person, calling a webhook, and deleting a person.
 - A wait node is either a duration or an absolute date.
 - Webhook URLs must be HTTPS on port 443 and resolve to a public address; localhost, private ranges and cloud metadata endpoints are refused.
