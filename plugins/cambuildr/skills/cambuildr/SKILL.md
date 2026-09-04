@@ -16,7 +16,7 @@ version: 0.4.0
 
 Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations) and the **media library**.
 
-The server exposes **34 tools, 5 prompts and 4 resources**.
+The server exposes **36 tools, 5 prompts and 4 resources**.
 
 ## Tool names are kebab-case
 
@@ -57,9 +57,9 @@ Every `create-*` tool returns an entity with an **empty body**. The next step is
 
 Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the content** — body, subject, preheader, audience filter rules, workflow graph.
 
-## Tool reference (34 tools)
+## Tool reference (36 tools)
 
-### Read (15)
+### Read (17)
 
 | Tool | Purpose |
 |------|---------|
@@ -78,6 +78,8 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `get-hosted-landing-page-contract` | The authoring contract for externally authored pages. An optional `landing_page_id` adds that page's variant ids and existing signup forms. |
 | `read-person` | One person record: name, email, tags, addresses, donation summary. |
 | `search-media-library` | Search the media library by `query`, `folder` and `kind` (`image` / `document`). Returns each match with its first-party URL. Paginated. |
+| `search` | One text query across landing pages, campaign mails, triggered mails, target audiences, workflows and people. Returns a short list, each row carrying a composite id (`landing_page:42`), a title and an admin URL. Exists because some clients — ChatGPT's connector among them — drive a server through a `search`/`fetch` pair rather than per-type tools. Prefer `list-content` / `list-people` when you want pagination and full rows. |
+| `fetch` | One record in full, by a composite id `search` returned. The other half of the same pair. |
 
 ### Write — core entities (10)
 

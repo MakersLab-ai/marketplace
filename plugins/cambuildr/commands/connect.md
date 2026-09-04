@@ -11,20 +11,6 @@ Cambuildr is multi-tenant: every account has its own endpoint at
 endpoint up as an MCP server named **`cambuildr`** — the exact name the skill and
 the other `/cambuildr:*` commands expect. Don't rename it.
 
-## Step 0 — Offer the tenant install path first
-
-If the user has admin access to their Cambuildr tenant, the shortest route is not this
-command at all. Their admin offers a ready-made install line at **`/admin/settings/mcp`**:
-
-```
-/plugin marketplace add https://<tenant>.cambuildr.com/mcp-plugin/<token>/marketplace.json
-```
-
-That archive ships the plugin with their `/mcp` URL already baked in, so no connector has
-to be added by hand. It needs **Claude Code 2.1.224 or newer** (the `archive` marketplace
-source type). Mention it once; if the user cannot reach that settings page, is on an older
-Claude Code, or is in a Claude app rather than the CLI, continue with this command.
-
 ## Step 1 — Get the tenant endpoint
 
 Ask the user for their Cambuildr tenant if you don't already have it. Accept any of:
