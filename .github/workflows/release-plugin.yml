@@ -1,0 +1,58 @@
+name: Release plugin
+
+# Tags and releases each plugin whose version changed in the push to main.
+#
+# The tag format is load-bearing, not cosmetic. The Cambuildr application polls this
+# repository's releases for tags matching `cambuildr-v*` and serves the newest one to its
+# tenants as their own installable plugin bundle. A release tagged anything else is
+# invisible to it, and tenants keep receiving the previous version indefinitely.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag and release changed plugins
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The manifests are diffed against github.event.before, which a shallow
+          # checkout may not contain when a push carries more than one commit.
+          fetch-depth: 0
+
+      - name: Find plugins whose version changed
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: python3 .github/scripts/changed_plugin_versions.py >> "$GITHUB_OUTPUT"
+
+      - name: Create tags and releases
+        if: steps.changed.outputs.releases != '[]'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES: ${{ steps.changed.outputs.releases }}
+        run: |
+          set -euo pipefail
+
+          echo "$RELEASES" | python3 -c 'import json,sys; [print(r["name"], r["version"]) for r in json.load(sys.stdin)]' \
+          | while read -r name version; do
+              tag="${name}-v${version}"
+
+              if gh release view "$tag" >/dev/null 2>&1; then
+                echo "$tag already released, skipping"
+                continue
+              fi
+
+              echo "Releasing $tag"
+              gh release create "$tag" \
+                --target "$GITHUB_SHA" \
+                --title "$name v$version" \
+                --notes "Release $version of the \`$name\` plugin. Install it with \`/plugin install ${name}@makerslab-ai\`, or update an existing installation with \`/plugin marketplace update makerslab-ai\` followed by \`/plugin update ${name}@makerslab-ai\`."
+            done
