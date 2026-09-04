@@ -31,29 +31,13 @@ The server exposes **34 tools, 5 prompts and 4 resources**.
 
 ## Installation
 
-Either path gives you the same plugin. The difference is only whether the MCP connector arrives pre-configured.
-
-### From the public marketplace
-
 ```
 /plugin marketplace add makerslab-ai/marketplace
 /plugin install cambuildr@makerslab-ai
 /cambuildr:connect
 ```
 
-`/cambuildr:connect` asks for your tenant and wires up the connector — a slug (`acme`), a host, or a full URL all work. Use this if you are trying Cambuildr out, or if you would rather not go through the admin panel.
-
-### From your own tenant, with the connector already set up
-
-Your Cambuildr admin shows a ready-made install line at **`/admin/settings/mcp`**:
-
-```
-/plugin marketplace add https://<your-tenant>.cambuildr.com/mcp-plugin/<token>/marketplace.json
-```
-
-The archive is built for your tenant, so the connector arrives with **your** `/mcp` URL already in it and there is no `/cambuildr:connect` step. Needs **Claude Code 2.1.224 or newer**, where the `archive` marketplace source type landed; on anything older, use the public path above.
-
-Connecting to more than one Cambuildr tenant at once? Give each a distinct **connector name** at `/admin/settings/mcp` before you install, or their tools collide under the same `cambuildr` prefix.
+`/cambuildr:connect` asks for your tenant and wires up the connector — a slug (`acme`), a host, or a full URL all work. Your Cambuildr admin also shows the exact MCP server URL and per-client setup steps at **`/admin/settings/mcp`**, if you would rather add the connection by hand in your client's own settings.
 
 ### Updates
 
@@ -67,7 +51,7 @@ Out of scope. The `.mcpb` bundle format is stdio-only and cannot express a remot
 
 ### MCP connector: `cambuildr` (remote HTTP)
 
-Talks to your tenant's `/mcp` endpoint over HTTP. The tenant-built archive ships it preconfigured; the public plugin does not, so `/cambuildr:connect` adds it. **Authentication:** OAuth 2.1 (RFC 8414 discovery). On the first tool call your browser opens, you log into Cambuildr, and you are connected — no API key in any config file.
+Talks to your tenant's `/mcp` endpoint over HTTP. The plugin carries no connector of its own — one fixed URL cannot serve every tenant — so `/cambuildr:connect` adds it for you. **Authentication:** OAuth 2.1 (RFC 8414 discovery). On the first tool call your browser opens, you log into Cambuildr, and you are connected — no API key in any config file.
 
 The server must be named exactly `cambuildr`; the skill and the commands address it by that name.
 
