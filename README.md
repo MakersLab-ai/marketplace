@@ -105,7 +105,7 @@ Zwei Workflows setzen das durch, nichts davon passiert von Hand:
 Zwei Regeln, die daraus folgen:
 
 - **Beide Versionsnummern immer gemeinsam erhöhen.** Ein Mismatch ist zur Laufzeit unsichtbar — Claude Code liest den Katalogeintrag und das installierte Manifest getrennt, und ein Release erreicht die User schlicht nicht. Der Parity-Check macht daraus einen roten PR statt eines stillen Nicht-Updates.
-- **Das Tag-Format ist funktional, nicht kosmetisch.** Die Cambuildr-Applikation pollt die Releases dieses Repos nach `cambuildr-v*` und baut daraus die tenant-spezifischen Plugin-Bundles, die Kunden unter `/admin/settings/mcp` installieren. Ein Release mit abweichendem Tag ist für sie unsichtbar, und die Tenants bekommen weiter die alte Version.
+- **Das `cambuildr`-Plugin wird generiert, nicht hier gepflegt.** Seine Quelle ist `resources/mcp-plugin/` im Applikations-Repo, damit es im selben Pull Request wie der MCP-Server geändert wird, den es beschreibt, und nicht von ihm abweichen kann. Ein Release-Job dort pusht diese Kopie hierher; Änderungen direkt in `plugins/cambuildr/` werden beim nächsten Release überschrieben. Tenants bekommen ihre eigene, vorkonfigurierte Kopie direkt aus der Applikation — dieser Katalog ist der öffentliche Discovery-Kanal, keine Distributions-Abhängigkeit.
 
 Manuelles Tag-Setzen ist damit nur noch nötig, wenn User sich per `ref` auf einen bestimmten Stand pinnen sollen.
 

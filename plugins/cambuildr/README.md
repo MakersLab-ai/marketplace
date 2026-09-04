@@ -1,3 +1,12 @@
+<!--
+  GENERATED — do not edit here.
+
+  The source of truth for this plugin is resources/mcp-plugin/ in the private
+  MakersLab-ai/cambuildr repository, so it changes in the same pull request as
+  the MCP server it documents and cannot drift from it. A release job in that
+  repository publishes this copy; edits made here are overwritten.
+-->
+
 # Cambuildr Plugin
 
 Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campaign emails, automated (triggered) emails, workflows, target audiences, tags, the media library and supporters — directly from Claude.
@@ -22,30 +31,33 @@ The server exposes **34 tools, 5 prompts and 4 resources**.
 
 ## Installation
 
-### Primary path — install from your own tenant
+Either path gives you the same plugin. The difference is only whether the MCP connector arrives pre-configured.
 
-Your Cambuildr admin offers a ready-made install line at **`/admin/settings/mcp`**. It looks like this:
+### From the public marketplace
+
+```
+/plugin marketplace add makerslab-ai/marketplace
+/plugin install cambuildr@makerslab-ai
+/cambuildr:connect
+```
+
+`/cambuildr:connect` asks for your tenant and wires up the connector — a slug (`acme`), a host, or a full URL all work. Use this if you are trying Cambuildr out, or if you would rather not go through the admin panel.
+
+### From your own tenant, with the connector already set up
+
+Your Cambuildr admin shows a ready-made install line at **`/admin/settings/mcp`**:
 
 ```
 /plugin marketplace add https://<your-tenant>.cambuildr.com/mcp-plugin/<token>/marketplace.json
 ```
 
-Paste it into Claude Code, then install the plugin it offers. The archive is built for your tenant, so the MCP connector arrives with **your** `/mcp` URL already configured — nothing to type, nothing to wire up by hand.
+The archive is built for your tenant, so the connector arrives with **your** `/mcp` URL already in it and there is no `/cambuildr:connect` step. Needs **Claude Code 2.1.224 or newer**, where the `archive` marketplace source type landed; on anything older, use the public path above.
 
-Requires **Claude Code 2.1.224 or newer**, which is where the `archive` marketplace source type landed. On an older version the marketplace will not resolve; upgrade, or use the fallback below.
-
-### Fallback path — public marketplace plus `/cambuildr:connect`
-
-```
-/plugin marketplace add makerslab-ai/marketplace
-/plugin install cambuildr@makerslab-ai
-```
-
-The publicly published plugin carries **no** MCP connector, because one fixed URL cannot serve every tenant. Run `/cambuildr:connect` afterwards to add the connector for yours.
+Connecting to more than one Cambuildr tenant at once? Give each a distinct **connector name** at `/admin/settings/mcp` before you install, or their tools collide under the same `cambuildr` prefix.
 
 ### Updates
 
-Both paths update through `/plugin marketplace update` followed by `/plugin update`. This is not a silent auto-update: the catalog is re-read only when you ask for it.
+Both paths update through `/plugin marketplace update` then `/plugin update`. Not a silent auto-update: the catalog is re-read only when you ask.
 
 ### Claude Desktop (`.mcpb`)
 
