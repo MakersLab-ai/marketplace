@@ -42,6 +42,7 @@ Call `create-landing-page` with:
 - `name` — required
 - `description` — if provided
 - `page_title` — if provided
+- `goal` — the goal / CTA from step 1, as one or two sentences saying what the page should achieve; it is read by the admin and the assistant
 
 Capture the returned `id` and admin URL.
 

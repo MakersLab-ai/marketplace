@@ -16,7 +16,7 @@ version: 0.4.0
 
 Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations) and the **media library**.
 
-The server exposes **36 tools, 5 prompts and 4 resources**.
+The server exposes **37 tools, 5 prompts and 4 resources**.
 
 ## Tool names are kebab-case
 
@@ -70,7 +70,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `list-custom-fields` | The tenant's custom fields with their type and, for select-style fields, their allowed values. Paginated. |
 | `list-trigger-actions` | The internal trigger action catalog. No arguments returns the `name.context` keys grouped by category; `action` returns that key's valid sources; `action` plus `source_id` returns the valid classes/answers (and the selectable Stripe products for purchase actions). |
 | `list-workflows` | The tenant's automation workflows: id, name, description, active state, re-enrollment policy, and whether a graph version is published. Filter by `search` and `active`. Paginated. |
-| `get-landing-page` | Full landing-page details: name, description, page title, publish state, slug, variants, tags. |
+| `get-landing-page` | Full landing-page details: name, description, page title, publish state, slug, variants, tags, plus `goal` (the user's goal, or the AI-inferred one when none is set) and `goal_source` (`user`, `inferred` or `none`). |
 | `get-campaign-mail` | Full campaign-mail details: state, planned date, variants, target audiences, tags. |
 | `get-trigger` | Full triggered-mail details: active state, action configuration, delay settings, and variants with their subject, sender and content. |
 | `get-target-audience` | Target-audience details: people count, computation state, archive status. |
@@ -85,8 +85,8 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 
 | Tool | What's possible | What's NOT possible |
 |------|------------------|----------------------|
-| `create-landing-page` | Create an empty editor landing page: `name`, `description`, `page_title`. Returns id + admin URL. | No body, share metadata or publish state. Body goes through `instruct-assistant`, metadata through `update-landing-page`. |
-| `update-landing-page` | `name`, `description`, `page_title`, `share_title`, `share_description`, `is_published`. | Cannot edit the body. Cannot manage variants or tags. |
+| `create-landing-page` | Create an empty editor landing page: `name`, `description`, `page_title`, `goal` (what the page should achieve, in one or two sentences; read by the admin and the assistant). Returns id + admin URL. | No body, share metadata or publish state. Body goes through `instruct-assistant`, metadata through `update-landing-page`. |
+| `update-landing-page` | `name`, `description`, `page_title`, `share_title`, `share_description`, `is_published`, `goal` (what the page should achieve, in one or two sentences; read by the admin and the assistant). Returns `goal` and `goal_source` like `get-landing-page`. | Cannot edit the body. Cannot manage variants or tags. |
 | `create-campaign-mail` | Create a campaign mail in `EDITING` state: `name`, `description`. Returns id + admin URL. | No subject, preheader, audience, planned date or body. Subject, preheader and body go through `instruct-assistant`. |
 | `update-campaign-mail` | `name`, `description`, `group_ids` (target audiences), `tag_ids`. Only while in `EDITING`. | Cannot advance state, set the planned date, or edit the body. |
 | `create-trigger` | Create a triggered mail, inactive: `name`, `description`, and optionally the action binding. Returns id + admin URL. | Body empty. Stays inactive until `update-trigger active=true`. Do not pass a hand-written action name — see the trigger section below. |
@@ -109,12 +109,12 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 
 | Tool | What's possible |
 |------|------------------|
-| `create-hosted-landing-page` | Create a page whose content is raw HTML: `name`, `description`, `page_title`, optional `body_html`. Returns the page id, the default variant id and the public URL. |
+| `create-hosted-landing-page` | Create a page whose content is raw HTML: `name`, `description`, `page_title`, `goal` (what the page should achieve, in one or two sentences; read by the admin and the assistant), optional `body_html`. Returns the page id, the default variant id and the public URL. |
 | `set-hosted-landing-page-content` | Replace one variant's `body_html`. Defaults to the first variant. Rejected on editor pages. |
 | `create-hosted-landing-page-variant` | Add an A/B variant with its own `body_html`, optional `name`, `is_published`, and `starts_at` / `ends_at` (ISO 8601). |
 | `create-hosted-landing-page-signup-form` | Define a signup form for a hosted variant. Returns the form id, the submit endpoint and a field schema to render a plain HTML form against. |
 
-### AI content (1)
+### AI content (2)
 
 `instruct-assistant(entity_type, entity_id, variant_id?, instruction)`.
 
@@ -135,6 +135,16 @@ What the assistant does per entity type:
 **`instruct-assistant` is registered only when the tenant has opted in to the AI assistant.** If the tenant has not, the tool is simply **absent from the tool list** while every other tool keeps working. That is not an error to retry: say so plainly and offer the paths that do not need it — hosted HTML pages, metadata-only updates, or editing in the Cambuildr admin UI.
 
 `instruct-assistant` also spends AI credits. When the balance is exhausted the call returns an error saying so; the fix is a top-up, not a retry.
+
+### Checking a landing page
+
+`check-landing-page(landing_page_id, variant_id?, goal?)` runs an AI review of one landing page variant against its goal — call to action, message, structure, trust, sharing metadata, campaign fit — and returns a deterministic score from 0-100 plus findings, each with a suggested fix. Call it after `instruct-assistant` has set the content and before publishing.
+
+- `variant_id` defaults to the first published variant, or failing that the first variant.
+- `goal`, when given, is saved as the page's goal (same field `update-landing-page`'s `goal` writes) and the review judges the page against it; otherwise the page's already-saved or inferred goal is used.
+- Runs synchronously and can take up to a minute. Spends AI credits on every call.
+- Runs synchronously, so it skips the screenshot, dead-link and page-speed passes an admin-triggered check makes — content findings only.
+- **Registered only when the tenant has both the AI opt-in and the `ai_page_check` feature enabled** — narrower gating than `instruct-assistant`, which needs only the opt-in. Missing from the tool list means one of those two is off, not a connection problem.
 
 ## Capability matrix — what each `entity_type` can build
 
