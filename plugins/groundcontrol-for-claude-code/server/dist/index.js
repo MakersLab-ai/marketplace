@@ -15695,7 +15695,7 @@ var contextTools = [
   },
   {
     name: "gc_get_changes",
-    description: "Get all changes (new comments, new tasks, status changes, doc updates) since a given timestamp. Use this at the start of each loop iteration to detect new feedback before picking up tasks.",
+    description: 'Get all changes (new comments, new tasks, status changes, doc updates) since a given timestamp. Use this at the start of each loop iteration to detect new feedback before picking up tasks. Every item carries `for`: "self" = it concerns YOU, act on it. "principal" = it concerns the human you are the personal assistant for \u2014 do NOT start work on it, tell them about it in the current session.',
     inputSchema: {
       type: "object",
       properties: {
@@ -15877,7 +15877,7 @@ var initiativeTools = [
         visibility: {
           type: "string",
           enum: ["public", "private"],
-          description: "public (default) = whole workspace. private = contents visible only to explicitly assigned members; the creator is added automatically."
+          description: "private (default) = contents visible only to explicitly assigned members; the creator \u2014 and, when an agent creates it, the agent's responsible user \u2014 is added automatically. public = whole workspace. Pass public when the initiative is meant for everyone."
         },
         default_assignee: {
           type: "string",

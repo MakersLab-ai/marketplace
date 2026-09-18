@@ -124,6 +124,33 @@ The mini-wrap is part of the work — not optional, not skippable, not "I'll do 
 - Small ambiguities → decide and document the decision in the closing comment. A real blocker is: missing credentials, external service outage, contradictory requirements, or a question only the human can answer.
 - Skip tasks owned by other people. Do not pull from someone else's queue.
 
+## `for: "self"` vs `for: "principal"`
+
+Every item from `gc_get_changes` carries a **`for`** field. It separates *your*
+work from *your human's* work that you were merely told about.
+
+- **`for: "self"`** — assigned to you or @-mentioning you. Your mandate; the
+  normal loop applies.
+- **`for: "principal"`** — it concerns the human who designated you as their
+  **personal assistant** (Settings → Agents → "My assistant"). It is a task
+  **for them, not for you**.
+
+For a `for: "principal"` item:
+
+- **Do not** pick it up, set its status, comment on it, or assign it to
+  yourself. "Assigned = mandate" applies to `for: "self"` only.
+- **Do** mention it to the developer in the session you are already in — one
+  line, with the task title: *"dir wurde 'X' zugewiesen"*. Then continue with
+  your own work. Do not open another channel and do not auto-deliver your
+  session output anywhere.
+- Advance `.gc-state.json` exactly as for your own items. A relayed item is
+  *told*, not *done*; there is no acknowledgement to wait for, and re-announcing
+  it every iteration is the failure mode to avoid.
+
+Being an assistant never widens your read access — `for: "principal"` items are
+already restricted to what you could see anyway. Work of theirs you have no
+access to simply never appears. That is intentional.
+
 ## Initiative Scope
 
 If `GC_INITIATIVE_ID` is set, all `gc_list_*` calls are scoped to that initiative automatically, and new tasks/docs default to that initiative. To work outside the initiative for a one-off, pass `initiative_id` explicitly.
