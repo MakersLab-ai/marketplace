@@ -11,8 +11,8 @@ Follow the `groundcontrol-coding` skill end-to-end:
 1. Read cursor from `.gc-state.json`, then capture `startedAt = now()` (before the next step).
 2. `gc_get_changes(since=<cursor>)` and react.
 3. `gc_list_tasks` (scoped by `GC_INITIATIVE_ID` if set).
-4. Pick highest-priority eligible task.
-5. Implement → branch → commit → push → PR → closing comment → status `done`.
+4. Pick highest-priority eligible task (`in_progress` first, then `todo`; never `backlog` — parked, not a mandate).
+5. Implement → branch → commit → push → PR → closing comment → status `done` (scrum workspace: `review`, a human closes).
 6. On blocker: stay `in_progress`, post comment, move to next task.
 7. Persist `startedAt` as the new cursor (not a fresh `now()` — an iteration can run for minutes, and an end-of-run timestamp would skip comments that arrived during the run).
 
