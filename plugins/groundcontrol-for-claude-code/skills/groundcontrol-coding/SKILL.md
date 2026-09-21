@@ -45,6 +45,7 @@ You are running as a coding agent inside a developer's Claude Code session. Your
    - First: any task with `status: in_progress` (resume what you started).
    - Then: `status: todo` sorted by priority `critical > high > medium > low`, ties broken by earlier `due_date`.
    - Skip: tasks assigned to anyone other than you.
+   - **Skip: tasks in `backlog`, even when assigned to you.** A backlog task is parked, not a mandate — don't start it, don't comment on it. The go-signal is its move to `todo` (arrives via `gc_get_changes`). Also skip `review` (a human is looking at it) and `done`.
 4. **Nothing to do?** Update `.gc-state.json` with `startedAt` (the timestamp captured in step 1, **not** a fresh `now()`), exit cleanly.
 5. **Has work?** Set `status: in_progress` via `gc_update_task` (if not already). Implement the task.
 6. **Branching and commits:**
@@ -77,9 +78,13 @@ You are running as a coding agent inside a developer's Claude Code session. Your
 
      Mini-Wrap: <LEARNINGS entry added at <path>#L<n> | nothing notable> · <docs updated: <files> | docs up to date>
      ```
-   - `gc_update_task(id, status: "done")`.
+   - `gc_update_task(id, status: "done")` — **in a scrum workspace (`gc_get_context` → `me.tenant.workflow === "scrum"`): `status: "review"` instead, never `done`.** A human reviews and closes. If the task comes back to `in_progress` with a comment, that is a rework request: read it and continue. The server doesn't block a wrong `done`; it returns a `scrum_expects_review` warning — treat it as a rule you broke.
 8. **On blocker:** Status remains `in_progress` (deliberate — not `blocked`). Post a comment via `gc_add_comment` explaining what's missing or ambiguous, with concrete questions. Move on to the next eligible task instead of exiting. (No mini-wrap on blockers — the work isn't done yet.)
 9. **Persist** the cursor to `.gc-state.json` only after the iteration completes (success, blocker, or empty) — writing **`startedAt`** (captured in step 1, *before* `gc_get_changes`), never a fresh `now()`. Using the start-of-iteration timestamp guarantees comments that arrived *during* the run are picked up next iteration; writing it at the *end* (rather than eagerly at the start) keeps it crash-safe — an aborted iteration leaves the old cursor untouched, so the batch is simply re-fetched next time (the agent's branch/PR/comment actions are idempotent).
+
+## Story points (scrum workspaces)
+
+In a scrum workspace you may estimate a task (`story_points`, Fibonacci 1 2 3 5 8 13 21); humans override. Kanban workspaces don't show points — don't set them there. A task too big for one iteration is simply several tasks: create them with `gc_create_task`, one per deliverable, and link them in their descriptions. There is no nesting.
 
 ## Mini-Wrap (runs before `status=done`)
 
@@ -123,6 +128,33 @@ The mini-wrap is part of the work — not optional, not skippable, not "I'll do 
 - The loop trigger is **non-interactive**. Never ask the developer questions during a loop iteration. Clarification lives in task comments.
 - Small ambiguities → decide and document the decision in the closing comment. A real blocker is: missing credentials, external service outage, contradictory requirements, or a question only the human can answer.
 - Skip tasks owned by other people. Do not pull from someone else's queue.
+
+## `for: "self"` vs `for: "principal"`
+
+Every item from `gc_get_changes` carries a **`for`** field. It separates *your*
+work from *your human's* work that you were merely told about.
+
+- **`for: "self"`** — assigned to you or @-mentioning you. Your mandate; the
+  normal loop applies.
+- **`for: "principal"`** — it concerns the human who designated you as their
+  **personal assistant** (Settings → Agents → "My assistant"). It is a task
+  **for them, not for you**.
+
+For a `for: "principal"` item:
+
+- **Do not** pick it up, set its status, comment on it, or assign it to
+  yourself. "Assigned = mandate" applies to `for: "self"` only.
+- **Do** mention it to the developer in the session you are already in — one
+  line, with the task title: *"dir wurde 'X' zugewiesen"*. Then continue with
+  your own work. Do not open another channel and do not auto-deliver your
+  session output anywhere.
+- Advance `.gc-state.json` exactly as for your own items. A relayed item is
+  *told*, not *done*; there is no acknowledgement to wait for, and re-announcing
+  it every iteration is the failure mode to avoid.
+
+Being an assistant never widens your read access — `for: "principal"` items are
+already restricted to what you could see anyway. Work of theirs you have no
+access to simply never appears. That is intentional.
 
 ## Initiative Scope
 

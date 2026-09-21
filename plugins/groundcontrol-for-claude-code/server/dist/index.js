@@ -15564,8 +15564,21 @@ var GroundControlClient = class {
   updateTask(id, input) {
     return this.request("PATCH", `/tasks/${id}`, input);
   }
-  listComments(taskId) {
-    return this.request("GET", `/tasks/${taskId}/comments`);
+  // The route pages 50 comments per call (max 100), oldest first — a single
+  // call on a long thread returned only the OLDEST ones and silently dropped
+  // the newest, i.e. the ones an agent most needs (task 425a1ed4). Page to the
+  // end; `total` is re-read per page so a comment added mid-walk is included.
+  async listComments(taskId) {
+    const data = [];
+    let total = Infinity;
+    while (data.length < total) {
+      const page = await this.request("GET", `/tasks/${taskId}/comments?limit=100&offset=${data.length}`);
+      const rows = page?.data ?? [];
+      total = page?.meta?.total ?? 0;
+      if (rows.length === 0) break;
+      data.push(...rows);
+    }
+    return { data, meta: { total: data.length } };
   }
   createComment(taskId, body) {
     return this.request("POST", `/tasks/${taskId}/comments`, { body });
@@ -15683,7 +15696,7 @@ function loadDotenv(cwd = process.cwd(), home = process.env.HOME ?? "") {
 var contextTools = [
   {
     name: "gc_get_context",
-    description: "Get your identity, workspace info, and currently assigned tasks. Call this first at the start of every loop iteration.",
+    description: 'Get your identity, workspace info, and currently assigned tasks. Call this first at the start of every loop iteration. `me.tenant.workflow` is "kanban" or "scrum": in a scrum workspace finish tasks with status "review" (a human sets "done"), and a task in "backlog" is parked \u2014 never start it, the go-signal is its move to "todo".',
     inputSchema: { type: "object", properties: {}, required: [] },
     async execute(_input, client) {
       const [me, tasks] = await Promise.all([
@@ -15695,7 +15708,7 @@ var contextTools = [
   },
   {
     name: "gc_get_changes",
-    description: "Get all changes (new comments, new tasks, status changes, doc updates) since a given timestamp. Use this at the start of each loop iteration to detect new feedback before picking up tasks.",
+    description: 'Get all changes (new comments, new tasks, status changes, doc updates) since a given timestamp. Use this at the start of each loop iteration to detect new feedback before picking up tasks. Every item carries `for`: "self" = it concerns YOU, act on it. "principal" = it concerns the human you are the personal assistant for \u2014 do NOT start work on it, tell them about it in the current session.',
     inputSchema: {
       type: "object",
       properties: {
@@ -15730,14 +15743,16 @@ var contextTools = [
 var taskTools = [
   {
     name: "gc_list_tasks",
-    description: 'List tasks with optional filters. Use `assigned_to: "me"` to get your own queue. Filter by status (scheduled | todo | in_progress | blocked | done) and priority (low | medium | high | critical).',
+    description: 'List tasks with optional filters. Use `assigned_to: "me"` to get your own queue. Filter by status (backlog | scheduled | todo | in_progress | blocked | review | done) and priority (low | medium | high | critical). Top of the backlog: status "backlog", sort "rank", limit 1.',
     inputSchema: {
       type: "object",
       properties: {
-        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"] },
+        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "review", "done"] },
         assigned_to: { type: "string", description: '"me" for your own tasks, or a tenant_member UUID' },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
         initiative_id: { type: "string" },
+        sort: { type: "string", enum: ["created_at", "completed_at", "rank"], description: "created_at (default, newest first), completed_at, or rank (manual backlog order, top first)" },
+        estimated: { type: "boolean", description: "false = tasks without story points (refinement list), true = tasks with an estimate" },
         limit: { type: "number", default: 50 }
       },
       required: []
@@ -15791,11 +15806,12 @@ var taskTools = [
       properties: {
         title: { type: "string" },
         description: { type: "string" },
-        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"], default: "todo" },
+        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "review", "done"], default: "todo" },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"], default: "medium" },
         initiative_id: { type: "string", description: "Initiative UUID (optional; must be visible to you \u2014 omit for a personal task shared only with your responsible user)" },
         assigned_to: { type: "string", description: 'tenant_member UUID, or "me"' },
-        due_date: { type: "string", description: "ISO date YYYY-MM-DD" }
+        due_date: { type: "string", description: "ISO date YYYY-MM-DD" },
+        story_points: { type: "number", description: "Estimate, integer 0\u2013999 (Fibonacci 1 2 3 5 8 13 is the convention). Only meaningful in scrum workspaces." }
       },
       required: ["title"]
     },
@@ -15807,17 +15823,18 @@ var taskTools = [
   },
   {
     name: "gc_update_task",
-    description: "Update a task. Send only the fields you want to change.",
+    description: 'Update a task. Send only the fields you want to change. In a scrum workspace (gc_get_context \u2192 me.tenant.workflow) finish with status "review", never "done".',
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string" },
         title: { type: "string" },
         description: { type: "string" },
-        status: { type: "string", enum: ["scheduled", "todo", "in_progress", "blocked", "done"] },
+        status: { type: "string", enum: ["backlog", "scheduled", "todo", "in_progress", "blocked", "review", "done"] },
         priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
         assigned_to: { type: "string" },
-        due_date: { type: "string" }
+        due_date: { type: "string" },
+        story_points: { type: "number", description: "Estimate, integer 0\u2013999; null clears it. Only meaningful in scrum workspaces." }
       },
       required: ["id"]
     },
@@ -15877,7 +15894,7 @@ var initiativeTools = [
         visibility: {
           type: "string",
           enum: ["public", "private"],
-          description: "public (default) = whole workspace. private = contents visible only to explicitly assigned members; the creator is added automatically."
+          description: "public (default) = every workspace member and agent sees the initiative and its contents. private = contents visible only to explicitly assigned members; the creator \u2014 and, when an agent creates it, the agent's responsible user \u2014 is added automatically. Pass private only when the initiative must be restricted."
         },
         default_assignee: {
           type: "string",
