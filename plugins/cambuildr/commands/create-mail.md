@@ -26,6 +26,7 @@ Emails support these blocks:
 - **POLL survey** (multiple choice, 2–4 answers).
 - **Share buttons** (mail, FB, X/Twitter, LinkedIn, WhatsApp, Telegram, Threads, Bluesky) — URL is required.
 - **Merge tags** `{{ var:firstname }}`, custom fields, customer fields. Triggered mails additionally get **action-specific placeholders** (e.g. donation amount, event data) drawn from the bound trigger action — the agent introspects them at runtime, so describe what you want rather than guessing tag names.
+- **Linking to a Cambuildr landing page and prefilling its form:** use `{{ var:prefill_link }}` as the entire query string, e.g. `https://<tenant-domain>/<page>?{{ var:prefill_link }}`, not separate placeholders like `?firstname={{ var:firstname }}&email={{ var:email }}`. It resolves to a signed, short-lived token instead of the raw value, so nothing personal ends up in the URL. A plain person variable inside a link still works and the assistant will still save it — it just surfaces a non-blocking warning — so reserve that for links to an external system that genuinely needs the raw value.
 
 Emails do **NOT** support: signup forms, donation blocks, purchase blocks, countdowns, multi-type surveys (SENTIMENT / MULTI_SWIPE / VERIFIED_VOTING), progress bars, event/commitment/UGC teasers. If the user asks for any of these, stop and explain — offer to make a landing page instead and link to it from the email.
 

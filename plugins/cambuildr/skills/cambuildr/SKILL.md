@@ -138,12 +138,14 @@ What the assistant does per entity type:
 
 ### Checking a landing page
 
-`check-landing-page(landing_page_id, variant_id?, goal?)` runs an AI review of one landing page variant against its goal — call to action, message, structure, trust, sharing metadata, campaign fit — and returns a deterministic score from 0-100 plus findings, each with a suggested fix. Call it after `instruct-assistant` has set the content and before publishing.
+`check-landing-page(landing_page_id, variant_id?, goal?)` runs an AI review of one landing page variant against its goal — call to action, message, structure, trust, sharing metadata, goal fit, feature fit — and returns a deterministic score from 0-100 plus findings, each with a suggested fix. Call it after `instruct-assistant` has set the content and before publishing.
 
 - `variant_id` defaults to the first published variant, or failing that the first variant.
 - `goal`, when given, is saved as the page's goal (same field `update-landing-page`'s `goal` writes) and the review judges the page against it; otherwise the page's already-saved or inferred goal is used.
 - Runs synchronously and can take up to a minute. Spends AI credits on every call.
-- Runs synchronously, so it skips the screenshot, dead-link and page-speed passes an admin-triggered check makes — content findings only.
+- Every finding carries one of the categories `cta`, `message`, `structure`, `trust`, `sharing`, `goal_fit`, `feature_fit`, `accessibility`. `accessibility` findings only ever come from a check started in the Cambuildr admin UI.
+- A `feature_fit` finding says the page's goal calls for a Cambuildr block the page is not using — a donation block for a fundraising page, a supporter block for a petition — and names that block in `location.block_type`. That is the same block id `instruct-assistant` takes, so the fix is a follow-up `instruct-assistant` call, not a question back to the user about what the block is called.
+- Because it runs synchronously it reviews the page's content only: it skips the screenshot, dead-link, page-speed and accessibility passes an admin-triggered check makes, so it makes no pixel judgement — nothing about how the page renders, how it looks on a phone, broken links, page speed, alt text, headings, colour contrast or font size. It *does* report the document's own ordering, so a call to action written far down the page is still flagged.
 - **Registered only when the tenant has both the AI opt-in and the `ai_page_check` feature enabled** — narrower gating than `instruct-assistant`, which needs only the opt-in. Missing from the tool list means one of those two is off, not a connection problem.
 
 ## Capability matrix — what each `entity_type` can build
@@ -183,6 +185,7 @@ Text, Paragraph, Heading, Button, Image, Video, Spacer, Divider, Icons, Social, 
 - **Trigger**: the same, **plus** action-specific placeholders derived from the bound trigger action (a donation amount on a donation action, event data on event actions). The assistant introspects the available list at runtime, so describe what you want in the instruction rather than guessing tag names.
 - Internal links in emails are auto-prefixed with the tenant's base URL by the agent.
 - **Landing pages have no merge tags.**
+- **Linking an email to a Cambuildr landing page and prefilling its form:** use `{{ var:prefill_link }}` as the entire query string, e.g. `https://<tenant-domain>/<page>?{{ var:prefill_link }}`. It resolves to a signed, short-lived token — not the recipient's raw data — so nothing personal travels in the URL. Do not spell the prefill out as separate placeholders (`?firstname={{ var:firstname }}&email={{ var:email }}`). Putting a person variable (`{{ var:email }}`, a name, a custom field) directly inside a link still works, but the editor will show a non-blocking warning, because the value then travels in the URL where analytics, server logs and the destination's own tracking can read it — reserve that for a link to an external system that genuinely needs the raw value.
 
 ### Styling rules the agents enforce
 
