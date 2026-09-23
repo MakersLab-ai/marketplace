@@ -16464,7 +16464,7 @@ var tableTools = [
       type: "object",
       properties: {
         table_id: { type: "string" },
-        filter: { type: "array", items: { type: "object" }, description: "[{field, op, value}], AND-combined" },
+        filter: { type: "array", items: { type: "object", additionalProperties: true }, description: "[{field, op, value}], AND-combined" },
         sort: { type: "string", description: "fld_x:asc | fld_x:desc" },
         q: { type: "string" },
         all: { type: "boolean" },
@@ -16484,7 +16484,7 @@ var tableTools = [
       type: "object",
       properties: {
         table_id: { type: "string" },
-        rows: { type: "array", items: { type: "object" }, minItems: 1, maxItems: 100 }
+        rows: { type: "array", items: { type: "object", additionalProperties: true }, minItems: 1, maxItems: 100 }
       },
       required: ["table_id", "rows"]
     },
@@ -16501,7 +16501,7 @@ var tableTools = [
         table_id: { type: "string" },
         rows: {
           type: "array",
-          items: { type: "object", properties: { id: { type: "string" }, data: { type: "object" } }, required: ["id", "data"] },
+          items: { type: "object", properties: { id: { type: "string" }, data: { type: "object", additionalProperties: true } }, required: ["id", "data"] },
           minItems: 1,
           maxItems: 100
         }
