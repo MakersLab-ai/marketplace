@@ -16323,14 +16323,14 @@ async function listRows(input, client) {
 var tableTools = [
   {
     name: "gc_list_tables",
-    description: "List the datasheets (user-defined data tables, API path /tables) you can see, each with its full field definitions. Call this \u2014 or gc_get_table \u2014 BEFORE writing rows: row data is keyed by field id (fld_xxxx), not by field name. Returns 404 when this workspace does not have the datasheets module.",
+    description: "List the datasheets (user tables) you can see, with their fields. HTTP 404 = no datasheets module in this workspace: say so, don't retry.",
     inputSchema: {
       type: "object",
       properties: {
-        initiative_id: { type: "string", description: "Only datasheets in this initiative" },
-        q: { type: "string", description: "Search datasheet names" },
-        limit: { type: "number", description: "Max 200 (default 100)" },
-        offset: { type: "number", description: "Offset for paging" }
+        initiative_id: { type: "string" },
+        q: { type: "string" },
+        limit: { type: "number" },
+        offset: { type: "number" }
       },
       required: []
     },
@@ -16342,10 +16342,10 @@ var tableTools = [
   },
   {
     name: "gc_get_table",
-    description: 'Get one datasheet with its full field definitions: field id (fld_xxxx), name, type (text|number|boolean|date|single_select|multi_select), required, position, and for select fields the options as {id: "opt_xxxx", label}. Those ids are what row data is keyed by and what select values must be \u2014 read them here before writing. Returns 404 when the workspace does not have the datasheets module.',
+    description: "A datasheet's schema: field ids (fld_\u2026), types, option ids (opt_\u2026). Read it before writing rows. HTTP 404 = not found, or no datasheets module.",
     inputSchema: {
       type: "object",
-      properties: { table_id: { type: "string", description: "Datasheet UUID" } },
+      properties: { table_id: { type: "string" } },
       required: ["table_id"]
     },
     async execute(input, client) {
@@ -16354,22 +16354,21 @@ var tableTools = [
   },
   {
     name: "gc_create_table",
-    description: 'Create a datasheet with its columns. Field types: text, number, boolean, date (ISO 8601), single_select, multi_select; options are plain labels, the option ids are generated and come back in the response. Visibility is inherited from the initiative, exactly like a doc (public initiative = the whole workspace, private = its members, no initiative = you and your responsible user) \u2014 there is no visibility field. Example: {"name":"Speakers","initiative_id":"<uuid>","fields":[{"name":"Speaker","type":"text","required":true},{"name":"Status","type":"single_select","options":["Invited","Confirmed"]}]}. Returns 404 when the workspace does not have the datasheets module.',
+    description: "Create a datasheet with its columns. Options are labels (ids returned). Visibility follows the initiative.",
     inputSchema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Datasheet name, unique in the workspace" },
+        name: { type: "string" },
         description: { type: "string" },
-        initiative_id: { type: "string", description: "Initiative UUID \u2014 decides who can see the datasheet" },
+        initiative_id: { type: "string" },
         fields: {
           type: "array",
-          description: "The columns, in order",
           items: {
             type: "object",
             properties: {
               name: { type: "string" },
               type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
-              options: { type: "array", items: { type: "string" }, description: "Labels, select types only" },
+              options: { type: "array", items: { type: "string" } },
               required: { type: "boolean" }
             },
             required: ["name", "type"]
@@ -16384,14 +16383,14 @@ var tableTools = [
   },
   {
     name: "gc_update_table",
-    description: "Rename a datasheet, change its description, or move it to another initiative (which changes who can see it). Only its creator, an owner or an admin may do this.",
+    description: "Rename, re-describe or move a datasheet to another initiative (creator/owner/admin).",
     inputSchema: {
       type: "object",
       properties: {
         table_id: { type: "string" },
         name: { type: "string" },
         description: { type: "string" },
-        initiative_id: { type: "string", description: "null moves it out of every initiative" }
+        initiative_id: { type: "string" }
       },
       required: ["table_id"]
     },
@@ -16402,7 +16401,7 @@ var tableTools = [
   },
   {
     name: "gc_delete_table",
-    description: "Delete a datasheet with all its rows and comments. Cannot be undone. Only its creator, an owner or an admin may do this.",
+    description: "Delete a datasheet with all rows and comments; irreversible (creator/owner/admin).",
     inputSchema: { type: "object", properties: { table_id: { type: "string" } }, required: ["table_id"] },
     async execute(input, client) {
       return client.deleteTable(input.table_id);
@@ -16410,14 +16409,14 @@ var tableTools = [
   },
   {
     name: "gc_add_field",
-    description: 'Add a column to a datasheet; it is appended at the end. Options are plain labels \u2014 the option ids (opt_xxxx) are generated and returned, and existing rows simply have no value in the new column. Example: {"table_id":"<uuid>","name":"Stage","type":"single_select","options":["Draft","Sent"]}.',
+    description: "Append a column. Options are labels (ids returned).",
     inputSchema: {
       type: "object",
       properties: {
         table_id: { type: "string" },
         name: { type: "string" },
         type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
-        options: { type: "array", items: { type: "string" }, description: "Labels, select types only" },
+        options: { type: "array", items: { type: "string" } },
         required: { type: "boolean" }
       },
       required: ["table_id", "name", "type"]
@@ -16429,12 +16428,12 @@ var tableTools = [
   },
   {
     name: "gc_update_field",
-    description: "Rename a column, make it required, move it (position, 0-based) or edit its options. options is the COMPLETE new list: [{id, label}] keeps an existing option (and its values in the rows), an entry without id is a new option, and an omitted one is removed. The type cannot be changed \u2014 add a new column instead.",
+    description: "Edit a column. options = the COMPLETE new list ({id, label} keeps, no id adds, omitted removes). The type is immutable.",
     inputSchema: {
       type: "object",
       properties: {
         table_id: { type: "string" },
-        field_id: { type: "string", description: "fld_xxxx, from gc_get_table" },
+        field_id: { type: "string", description: "fld_\u2026" },
         name: { type: "string" },
         required: { type: "boolean" },
         position: { type: "number" },
@@ -16452,7 +16451,7 @@ var tableTools = [
   },
   {
     name: "gc_delete_field",
-    description: "Remove a column from a datasheet. The values stored in that column are no longer shown or returned.",
+    description: "Remove a column from a datasheet.",
     inputSchema: { type: "object", properties: { table_id: { type: "string" }, field_id: { type: "string" } }, required: ["table_id", "field_id"] },
     async execute(input, client) {
       return client.deleteField(input.table_id, input.field_id);
@@ -16460,17 +16459,17 @@ var tableTools = [
   },
   {
     name: "gc_list_rows",
-    description: 'Read rows of a datasheet. filter: array of {field, op, value} combined with AND \u2014 ops eq, neq, gt, gte, lt, lte (number/date), contains (text), has_any, has_all (multi_select), is_empty, is_not_empty; select values are option ids (opt_xxxx), never labels. sort: "fld_x:asc" or "fld_x:desc" (default: newest first). q searches all text columns. Example: {"table_id":"<uuid>","filter":[{"field":"fld_ab12","op":"eq","value":"opt_ef56"}],"sort":"fld_cd34:desc"}. Set all=true to get EVERY matching row (the API caps one page at 200 and pages are walked for you); otherwise one page of `limit` rows is returned and meta.total says how many matched.',
+    description: "Read rows. Filter select fields by option id (opt_\u2026), never label. all=true returns every match, else one page.",
     inputSchema: {
       type: "object",
       properties: {
         table_id: { type: "string" },
         filter: { type: "array", items: { type: "object" }, description: "[{field, op, value}], AND-combined" },
         sort: { type: "string", description: "fld_x:asc | fld_x:desc" },
-        q: { type: "string", description: "Search across text columns" },
-        all: { type: "boolean", description: "Page to the end and return every matching row (default false)" },
-        limit: { type: "number", description: "Rows per page, max 200 (default 50). Ignored when all=true" },
-        offset: { type: "number", description: "Offset for paging. Ignored when all=true" }
+        q: { type: "string" },
+        all: { type: "boolean" },
+        limit: { type: "number" },
+        offset: { type: "number" }
       },
       required: ["table_id"]
     },
@@ -16480,12 +16479,12 @@ var tableTools = [
   },
   {
     name: "gc_create_rows",
-    description: 'Add rows to a datasheet. rows is an array of data objects keyed by FIELD ID, e.g. [{"fld_ab12":"Mara Weiss","fld_cd34":"opt_ef56","fld_gh78":3}]. single_select takes one option id, multi_select an array of option ids, date an ISO 8601 string. Max 100 rows per call and all or nothing: one invalid value rejects the whole batch with a validation error naming the field, the expected type and the value received.',
+    description: "Add \u2264100 rows (all or nothing), each keyed by field id (fld_\u2026); select values are option ids. See gc_get_table.",
     inputSchema: {
       type: "object",
       properties: {
         table_id: { type: "string" },
-        rows: { type: "array", items: { type: "object" }, minItems: 1, maxItems: 100, description: "Data objects keyed by field id" }
+        rows: { type: "array", items: { type: "object" }, minItems: 1, maxItems: 100 }
       },
       required: ["table_id", "rows"]
     },
@@ -16495,7 +16494,7 @@ var tableTools = [
   },
   {
     name: "gc_update_rows",
-    description: "Change existing rows. rows: [{id, data}] where id is the row UUID (from gc_list_rows) and data holds ONLY the fields to change \u2014 everything else stays. null clears a cell. Max 100 rows per call, all or nothing: one unknown row id aborts the whole batch.",
+    description: "Change \u2264100 rows (all or nothing): [{id, data}], data keyed by field id, changed fields only; null clears.",
     inputSchema: {
       type: "object",
       properties: {
@@ -16515,7 +16514,7 @@ var tableTools = [
   },
   {
     name: "gc_delete_rows",
-    description: "Delete rows of a datasheet by row id. Max 100 per call; unknown ids are skipped. Answers { deleted: n }.",
+    description: "Delete \u2264100 rows by id; unknown ids are skipped.",
     inputSchema: {
       type: "object",
       properties: { table_id: { type: "string" }, ids: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 } },
@@ -16527,7 +16526,7 @@ var tableTools = [
   },
   {
     name: "gc_comment_table",
-    description: "Leave a comment on a datasheet \u2014 visible to everyone who can see it, and the way to report back what you changed and why. Markdown and @-mentions work like task comments.",
+    description: "Comment on a datasheet (Markdown, @-mentions): say what you changed and why.",
     inputSchema: { type: "object", properties: { table_id: { type: "string" }, body: { type: "string" } }, required: ["table_id", "body"] },
     async execute(input, client) {
       return client.createTableComment(input.table_id, input.body);
