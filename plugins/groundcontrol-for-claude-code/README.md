@@ -21,6 +21,10 @@ Per project, one-time:
 
 This asks for your GROUNDCONTROL API key (`gc_live_…` from Settings → API Keys at https://groundcontrol.makerslab.ai), optionally scopes the project to one initiative, writes `.env` and `.gitignore`, and verifies the connection.
 
+### Datasheet tools
+
+The 13 datasheet tools (`gc_list_tables`, `gc_get_table`, `gc_list_rows`, `gc_create_rows`, …) are always present. Claude Code defers MCP tool schemas behind tool search, so they cost little context. Without the Datasheets module in the workspace, every call answers 404.
+
 ## Run
 
 ```

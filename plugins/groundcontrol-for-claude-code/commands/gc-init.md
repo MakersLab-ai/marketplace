@@ -20,6 +20,7 @@ Run this once per project. It collects the GROUNDCONTROL API key and optional in
    GC_API_URL=https://groundcontrol.makerslab.ai/api/v1
    GC_INITIATIVE_ID=<uuid-or-empty>
    ```
+   There is no switch for datasheets: the 13 `gc_*` datasheet tools are always present (Claude Code defers MCP tool schemas via tool search, so they cost little context), and they answer 404 when the workspace has no Datasheets module.
 
 5. **Update `.gitignore`.** Both `.env` and `.gc-state.json` must be present. If `.gitignore` doesn't exist, create it with both entries. If it exists, append any missing ones (do not duplicate).
 

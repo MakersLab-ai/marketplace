@@ -15656,6 +15656,82 @@ var GroundControlClient = class {
   saveJournalSummary(date3, agentSummary) {
     return this.request("POST", `/journal/${date3}/summary`, { agent_summary: agentSummary });
   }
+  // Datasheets (called "tables" on the wire: /api/v1/tables…). Every one of
+  // these 404s in a workspace without the feature flag — the same answer as a
+  // datasheet that does not exist, so the module's existence doesn't leak.
+  // Ported from openclaw-plugin/src/client.ts (canonical); keep them in sync.
+  listTables(params) {
+    return this.request("GET", `/tables${this.qs(params)}`);
+  }
+  getTable(id) {
+    return this.request("GET", `/tables/${id}`);
+  }
+  createTable(input) {
+    return this.request("POST", "/tables", input);
+  }
+  updateTable(id, input) {
+    return this.request("PATCH", `/tables/${id}`, input);
+  }
+  deleteTable(id) {
+    return this.request("DELETE", `/tables/${id}`);
+  }
+  addField(tableId, input) {
+    return this.request("POST", `/tables/${tableId}/fields`, input);
+  }
+  updateField(tableId, fieldId, input) {
+    return this.request("PATCH", `/tables/${tableId}/fields/${fieldId}`, input);
+  }
+  deleteField(tableId, fieldId) {
+    return this.request("DELETE", `/tables/${tableId}/fields/${fieldId}`);
+  }
+  // One page of rows, exactly as asked for.
+  listRows(tableId, params) {
+    return this.request("GET", `/tables/${tableId}/rows${this.qs(params)}`);
+  }
+  // Every row matching the query, paged like listComments(): the route caps
+  // `limit` at 200, so "give me the datasheet" is several requests and a single
+  // call would silently answer with the first 200 rows — a truncated list and a
+  // complete one look identical to the reader. The order is deterministic
+  // (chosen sort, then `id`), which is what makes offset paging safe; rows are
+  // still deduped by id because a row inserted mid-walk shifts the boundary and
+  // hands the same row to two pages. `maxPages` is a fan-out backstop, not a
+  // display limit — when it bites, `meta.truncated` says so instead of the
+  // answer just ending.
+  async listAllRows(tableId, params, maxPages = 25) {
+    const PAGE = 200;
+    const seen = /* @__PURE__ */ new Set();
+    const data = [];
+    let fetched = 0;
+    let matched = 0;
+    for (let page = 0; ; page++) {
+      if (page >= maxPages) return { data, meta: { total: data.length, matched, truncated: true } };
+      const res = await this.listRows(tableId, { ...params ?? {}, limit: PAGE, offset: fetched });
+      const rows = res?.data ?? [];
+      matched = res?.meta?.total ?? 0;
+      fetched += rows.length;
+      for (const r of rows) {
+        if (r?.id) {
+          if (seen.has(r.id)) continue;
+          seen.add(r.id);
+        }
+        data.push(r);
+      }
+      if (rows.length < PAGE || fetched >= matched) break;
+    }
+    return { data, meta: { total: data.length, matched, truncated: false } };
+  }
+  createRows(tableId, rows) {
+    return this.request("POST", `/tables/${tableId}/rows`, { rows: rows.map((data) => ({ data })) });
+  }
+  updateRows(tableId, rows) {
+    return this.request("PATCH", `/tables/${tableId}/rows`, { rows });
+  }
+  deleteRows(tableId, ids) {
+    return this.request("DELETE", `/tables/${tableId}/rows`, { ids });
+  }
+  createTableComment(tableId, body) {
+    return this.request("POST", `/tables/${tableId}/comments`, { body });
+  }
 };
 
 // src/dotenv.ts
@@ -16227,6 +16303,238 @@ var searchTools = [
   }
 ];
 
+// src/tools/tables.ts
+function rowQueryParams(input) {
+  const { table_id: _t, filter, all: _a3, ...rest } = input ?? {};
+  const params = {};
+  if (filter) params.filter = JSON.stringify(filter);
+  for (const [k, v] of Object.entries(rest)) if (v !== void 0 && v !== null && v !== "") params[k] = String(v);
+  return params;
+}
+async function listRows(input, client) {
+  const params = rowQueryParams(input);
+  if (input?.all === true) {
+    delete params.limit;
+    delete params.offset;
+    return client.listAllRows(input.table_id, params);
+  }
+  return client.listRows(input.table_id, params);
+}
+var tableTools = [
+  {
+    name: "gc_list_tables",
+    description: "List the datasheets (user-defined data tables, API path /tables) you can see, each with its full field definitions. Call this \u2014 or gc_get_table \u2014 BEFORE writing rows: row data is keyed by field id (fld_xxxx), not by field name. Returns 404 when this workspace does not have the datasheets module.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        initiative_id: { type: "string", description: "Only datasheets in this initiative" },
+        q: { type: "string", description: "Search datasheet names" },
+        limit: { type: "number", description: "Max 200 (default 100)" },
+        offset: { type: "number", description: "Offset for paging" }
+      },
+      required: []
+    },
+    async execute(input, client) {
+      const params = {};
+      for (const [k, v] of Object.entries(input ?? {})) if (v !== void 0 && v !== null && v !== "") params[k] = String(v);
+      return client.listTables(params);
+    }
+  },
+  {
+    name: "gc_get_table",
+    description: 'Get one datasheet with its full field definitions: field id (fld_xxxx), name, type (text|number|boolean|date|single_select|multi_select), required, position, and for select fields the options as {id: "opt_xxxx", label}. Those ids are what row data is keyed by and what select values must be \u2014 read them here before writing. Returns 404 when the workspace does not have the datasheets module.',
+    inputSchema: {
+      type: "object",
+      properties: { table_id: { type: "string", description: "Datasheet UUID" } },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      return client.getTable(input.table_id);
+    }
+  },
+  {
+    name: "gc_create_table",
+    description: 'Create a datasheet with its columns. Field types: text, number, boolean, date (ISO 8601), single_select, multi_select; options are plain labels, the option ids are generated and come back in the response. Visibility is inherited from the initiative, exactly like a doc (public initiative = the whole workspace, private = its members, no initiative = you and your responsible user) \u2014 there is no visibility field. Example: {"name":"Speakers","initiative_id":"<uuid>","fields":[{"name":"Speaker","type":"text","required":true},{"name":"Status","type":"single_select","options":["Invited","Confirmed"]}]}. Returns 404 when the workspace does not have the datasheets module.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Datasheet name, unique in the workspace" },
+        description: { type: "string" },
+        initiative_id: { type: "string", description: "Initiative UUID \u2014 decides who can see the datasheet" },
+        fields: {
+          type: "array",
+          description: "The columns, in order",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
+              options: { type: "array", items: { type: "string" }, description: "Labels, select types only" },
+              required: { type: "boolean" }
+            },
+            required: ["name", "type"]
+          }
+        }
+      },
+      required: ["name"]
+    },
+    async execute(input, client) {
+      return client.createTable(input);
+    }
+  },
+  {
+    name: "gc_update_table",
+    description: "Rename a datasheet, change its description, or move it to another initiative (which changes who can see it). Only its creator, an owner or an admin may do this.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+        initiative_id: { type: "string", description: "null moves it out of every initiative" }
+      },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      const { table_id, ...rest } = input;
+      return client.updateTable(table_id, rest);
+    }
+  },
+  {
+    name: "gc_delete_table",
+    description: "Delete a datasheet with all its rows and comments. Cannot be undone. Only its creator, an owner or an admin may do this.",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" } }, required: ["table_id"] },
+    async execute(input, client) {
+      return client.deleteTable(input.table_id);
+    }
+  },
+  {
+    name: "gc_add_field",
+    description: 'Add a column to a datasheet; it is appended at the end. Options are plain labels \u2014 the option ids (opt_xxxx) are generated and returned, and existing rows simply have no value in the new column. Example: {"table_id":"<uuid>","name":"Stage","type":"single_select","options":["Draft","Sent"]}.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        name: { type: "string" },
+        type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
+        options: { type: "array", items: { type: "string" }, description: "Labels, select types only" },
+        required: { type: "boolean" }
+      },
+      required: ["table_id", "name", "type"]
+    },
+    async execute(input, client) {
+      const { table_id, ...rest } = input;
+      return client.addField(table_id, rest);
+    }
+  },
+  {
+    name: "gc_update_field",
+    description: "Rename a column, make it required, move it (position, 0-based) or edit its options. options is the COMPLETE new list: [{id, label}] keeps an existing option (and its values in the rows), an entry without id is a new option, and an omitted one is removed. The type cannot be changed \u2014 add a new column instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        field_id: { type: "string", description: "fld_xxxx, from gc_get_table" },
+        name: { type: "string" },
+        required: { type: "boolean" },
+        position: { type: "number" },
+        options: {
+          type: "array",
+          items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } }, required: ["label"] }
+        }
+      },
+      required: ["table_id", "field_id"]
+    },
+    async execute(input, client) {
+      const { table_id, field_id, ...rest } = input;
+      return client.updateField(table_id, field_id, rest);
+    }
+  },
+  {
+    name: "gc_delete_field",
+    description: "Remove a column from a datasheet. The values stored in that column are no longer shown or returned.",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" }, field_id: { type: "string" } }, required: ["table_id", "field_id"] },
+    async execute(input, client) {
+      return client.deleteField(input.table_id, input.field_id);
+    }
+  },
+  {
+    name: "gc_list_rows",
+    description: 'Read rows of a datasheet. filter: array of {field, op, value} combined with AND \u2014 ops eq, neq, gt, gte, lt, lte (number/date), contains (text), has_any, has_all (multi_select), is_empty, is_not_empty; select values are option ids (opt_xxxx), never labels. sort: "fld_x:asc" or "fld_x:desc" (default: newest first). q searches all text columns. Example: {"table_id":"<uuid>","filter":[{"field":"fld_ab12","op":"eq","value":"opt_ef56"}],"sort":"fld_cd34:desc"}. Set all=true to get EVERY matching row (the API caps one page at 200 and pages are walked for you); otherwise one page of `limit` rows is returned and meta.total says how many matched.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        filter: { type: "array", items: { type: "object" }, description: "[{field, op, value}], AND-combined" },
+        sort: { type: "string", description: "fld_x:asc | fld_x:desc" },
+        q: { type: "string", description: "Search across text columns" },
+        all: { type: "boolean", description: "Page to the end and return every matching row (default false)" },
+        limit: { type: "number", description: "Rows per page, max 200 (default 50). Ignored when all=true" },
+        offset: { type: "number", description: "Offset for paging. Ignored when all=true" }
+      },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      return listRows(input, client);
+    }
+  },
+  {
+    name: "gc_create_rows",
+    description: 'Add rows to a datasheet. rows is an array of data objects keyed by FIELD ID, e.g. [{"fld_ab12":"Mara Weiss","fld_cd34":"opt_ef56","fld_gh78":3}]. single_select takes one option id, multi_select an array of option ids, date an ISO 8601 string. Max 100 rows per call and all or nothing: one invalid value rejects the whole batch with a validation error naming the field, the expected type and the value received.',
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        rows: { type: "array", items: { type: "object" }, minItems: 1, maxItems: 100, description: "Data objects keyed by field id" }
+      },
+      required: ["table_id", "rows"]
+    },
+    async execute(input, client) {
+      return client.createRows(input.table_id, input.rows);
+    }
+  },
+  {
+    name: "gc_update_rows",
+    description: "Change existing rows. rows: [{id, data}] where id is the row UUID (from gc_list_rows) and data holds ONLY the fields to change \u2014 everything else stays. null clears a cell. Max 100 rows per call, all or nothing: one unknown row id aborts the whole batch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        rows: {
+          type: "array",
+          items: { type: "object", properties: { id: { type: "string" }, data: { type: "object" } }, required: ["id", "data"] },
+          minItems: 1,
+          maxItems: 100
+        }
+      },
+      required: ["table_id", "rows"]
+    },
+    async execute(input, client) {
+      return client.updateRows(input.table_id, input.rows);
+    }
+  },
+  {
+    name: "gc_delete_rows",
+    description: "Delete rows of a datasheet by row id. Max 100 per call; unknown ids are skipped. Answers { deleted: n }.",
+    inputSchema: {
+      type: "object",
+      properties: { table_id: { type: "string" }, ids: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 } },
+      required: ["table_id", "ids"]
+    },
+    async execute(input, client) {
+      return client.deleteRows(input.table_id, input.ids);
+    }
+  },
+  {
+    name: "gc_comment_table",
+    description: "Leave a comment on a datasheet \u2014 visible to everyone who can see it, and the way to report back what you changed and why. Markdown and @-mentions work like task comments.",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" }, body: { type: "string" } }, required: ["table_id", "body"] },
+    async execute(input, client) {
+      return client.createTableComment(input.table_id, input.body);
+    }
+  }
+];
+
 // src/tools/index.ts
 var allTools = [
   ...contextTools,
@@ -16235,7 +16543,12 @@ var allTools = [
   ...objectiveTools,
   ...docTools,
   ...journalTools,
-  ...searchTools
+  ...searchTools,
+  // Datasheets: always served. Claude Code defers MCP tool schemas behind tool
+  // search, so 13 extra definitions cost little context here (the openclaw
+  // plugin folds them into one tool instead). Without the workspace module
+  // every call answers 404.
+  ...tableTools
 ];
 
 // src/index.ts
