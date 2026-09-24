@@ -54,11 +54,14 @@ This is the critical step — `create-landing-page` returns an **empty** page. C
 instruct-assistant(
   entity_type="landing_page",
   entity_id=<id from step 2>,
-  instruction="<detailed natural-language brief>"
+  instruction="<detailed natural-language brief>",
+  idempotency_key="<unique string for this edit>"
 )
 ```
 
 `variant_id` is optional; leave it out and the first variant is used.
+
+Always pass `idempotency_key`. `instruct-assistant` runs in the background and waits up to about 40 seconds: a call that finishes in time returns `{status: "success", run_status: "completed", run_id, assistant_message}` directly. A call still running when the wait ends returns `{status: "running", run_status: "pending"|"running", run_id, poll_with: "get-assistant-run", message}` instead — that is not a failure. Poll `get-assistant-run(run_id)` (its `status` moves through `pending` → `running` → `completed`/`failed`), or call `instruct-assistant` again with the exact same `idempotency_key` and arguments — that works even if AI credits have since run out, and never applies the edit twice. A run that ends `failed` stays failed under that key: to try again, use a NEW `idempotency_key`. Only one run per entity (and variant) can be in progress at a time — a second call while one is running is refused, naming the run already in progress.
 
 The instruction should be one block of text that lists every section to build, naming the block types explicitly. Example:
 
@@ -80,3 +83,5 @@ Report:
 - Do not use `update-landing-page` to try to edit the body — that tool only changes metadata. Body edits go through `instruct-assistant`.
 - Do not invent template IDs or block IDs; let the assistant agent pick them.
 - Do not paste large HTML into `instruct-assistant`. Raw HTML belongs on a hosted page, via `set-hosted-landing-page-content`.
+- Do not call `instruct-assistant` without an `idempotency_key`. Without one, a retry after a timeout can apply the same edit twice.
+- Do not treat `{status: "running", run_id}` as a failure — poll `get-assistant-run` or re-call `instruct-assistant` with the same `idempotency_key` instead.

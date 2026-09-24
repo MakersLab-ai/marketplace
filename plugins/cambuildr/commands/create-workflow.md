@@ -82,10 +82,13 @@ Two routes:
 instruct-assistant(
   entity_type="workflow",
   entity_id=<workflow id>,
-  instruction="<the steps in order, naming the mails, tags, waits and branch conditions>"
+  instruction="<the steps in order, naming the mails, tags, waits and branch conditions>",
+  idempotency_key="<unique string for this edit>"
 )
 ```
 Do not pass `variant_id` — workflows have no variants, and supplying it is an error. If `instruct-assistant` is absent, the tenant has not opted in to the AI assistant; use the explicit route.
+
+Always pass `idempotency_key`. `instruct-assistant` runs in the background and waits up to about 40 seconds: a call that finishes in time returns `{status: "success", run_status: "completed", run_id, assistant_message}` directly. A call still running when the wait ends returns `{status: "running", run_status: "pending"|"running", run_id, poll_with: "get-assistant-run", message}` instead — that is not a failure. Poll `get-assistant-run(run_id)` (its `status` moves through `pending` → `running` → `completed`/`failed`), or call `instruct-assistant` again with the exact same `idempotency_key` and arguments — that works even if AI credits have since run out, and never applies the edit twice. A run that ends `failed` stays failed under that key: to try again, use a NEW `idempotency_key`. Only one run per entity can be in progress at a time — a second call while one is running is refused, naming the run already in progress. Wait for the run to complete before reading the graph back with `get-workflow` in step 8.
 
 **Explicit graph:**
 ```
@@ -126,5 +129,7 @@ Call `get-workflow` and confirm it reports the start condition, a published grap
 - Do not send a partial graph to `set-workflow-graph`. It replaces everything.
 - Do not invent mail, tag or campaign ids. Take them from `get-workflow`.
 - Do not pass `variant_id` to `instruct-assistant` for a workflow.
+- Do not call `instruct-assistant` without an `idempotency_key`. Without one, a retry after a timeout can apply the same edit twice.
+- Do not treat `{status: "running", run_id}` as a failure — poll `get-assistant-run` or re-call `instruct-assistant` with the same `idempotency_key` instead.
 - Do not retry activation of a delete-person workflow, and do not tell the user it is live.
 - Do not use a workflow for what a single triggered mail does — one event, one email, optional delay is `/cambuildr:create-mail triggered`.

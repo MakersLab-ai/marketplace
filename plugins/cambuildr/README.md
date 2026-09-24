@@ -13,9 +13,9 @@ Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campai
 
 ## What this plugin does
 
-- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records.
-- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items.
-- **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity.
+- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, mail senders, and a person's action/UTM history.
+- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, restore a saved version, and send a test mail.
+- **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity. Runs longer than about 40 seconds return a `run_id` to poll with `get-assistant-run` instead of blocking.
 
 Three things in Cambuildr are easy to confuse:
 
@@ -27,7 +27,7 @@ Three things in Cambuildr are easy to confuse:
 
 The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-The server exposes **34 tools, 5 prompts and 4 resources**.
+The server exposes **48 tools, 5 prompts and 4 resources**.
 
 ## Installation
 
@@ -88,7 +88,7 @@ The same guided workflows also ship on the server as MCP prompts, so they reach 
 |---|---|
 | Feature flag `ai_mcp_server` | The MCP server itself. Without it there is no endpoint. |
 | Feature flag `ai_mcp_write_access` | Every write tool. Without it only the read tools are registered. |
-| AI opt-in for the customer | `instruct-assistant` only. Without it that one tool is **absent** while everything else works. |
+| AI opt-in for the customer | `instruct-assistant` and `get-assistant-run`. Without it both are **absent** while everything else works. `check-landing-page` needs the opt-in too, plus its own `ai_page_check` feature flag — missing means one of those two is off. |
 | Per-tool toggles at `/admin/settings/mcp` | Individual tools. A disabled tool is not registered. |
 
 `instruct-assistant` also needs AI credit; an exhausted balance returns an error asking for a top-up.
@@ -131,9 +131,9 @@ Two entity types have no blocks at all: a **target audience** is filter rules, a
 
 ## Troubleshooting
 
-- **No `cambuildr` tools at all.** The connector is not set up — run `/cambuildr:connect`, or install through your tenant's own marketplace URL.
-- **`/plugin marketplace add` fails on the tenant URL.** Your Claude Code is older than 2.1.224 and does not know the `archive` source type. Upgrade, or use the public marketplace plus `/cambuildr:connect`.
-- **`instruct-assistant` is missing but everything else works.** The tenant has not opted in to the AI assistant. That is a tenant setting, not a connection fault, and it removes only that one tool. Ask your Cambuildr account admin to opt in, or do the content work in the admin UI.
+- **No `cambuildr` tools at all.** The connector is not set up — run `/cambuildr:connect`. Your Cambuildr admin's **Settings → MCP** page shows the exact server URL and per-client setup steps for this tenant if you would rather connect by hand.
+- **`instruct-assistant` is missing but everything else works.** The tenant has not opted in to the AI assistant. That is a tenant setting, not a connection fault, and it removes `instruct-assistant` and `get-assistant-run` — not just the one tool. Ask your Cambuildr account admin to opt in, or do the content work in the admin UI. `check-landing-page` can be missing for a related but separate reason: it needs the same opt-in **plus** its own `ai_page_check` feature flag, so it can be absent even when `instruct-assistant` is present.
+- **New tools are missing even though the plugin/skill says they exist.** If this tenant previously saved a custom tool selection at `/admin/settings/mcp`, that created an explicit allow-list — newly added tools stay off for that tenant until someone enables them there, even though they work for every other tenant. Check `cambuildr://tools` against this doc; if a documented tool is absent and none of the other gates explain it, this is almost certainly why.
 - **"AI credits exhausted."** Top up the tenant's AI credit balance. Retrying does not help.
 - **Only read tools are present.** The `ai_mcp_write_access` feature flag is off for your tenant.
 - **One specific tool is missing.** It is toggled off at `/admin/settings/mcp`.
@@ -144,3 +144,6 @@ Two entity types have no blocks at all: a **target audience** is filter rules, a
 - **My target audience matches nobody.** It was created without rules. Run `instruct-assistant` with `entity_type: target_audience`, then re-read the count with `get-target-audience`.
 - **My workflow does nothing.** It needs a start condition (`set-workflow-start-condition`), a published graph (`set-workflow-graph`), and `active=true`.
 - **A tool name is rejected.** Names are kebab-case. Read `cambuildr://tools` for the exact spellings.
+- **`instruct-assistant` returned `{status: "running", run_status: "pending"|"running", run_id, poll_with: "get-assistant-run"}` instead of the usual result.** The run is taking longer than the ~40 second wait — this is not a failure. Poll `get-assistant-run(run_id)` until `status` is `completed` or `failed`, or re-call `instruct-assistant` with the exact same `idempotency_key` and arguments — that works even if AI credits have since run out. Always pass an `idempotency_key` so a retry can never apply the same edit twice. If the run ends `failed`, that key stays failed forever; retry with a new `idempotency_key`.
+- **`send-test-mail` rejects the recipient I asked for.** Test sends only go to the token owner or another admin user of the tenant — never an arbitrary address. Omit `recipients` to send to yourself. At most 5 recipients per call and 10 test mails per hour per user.
+- **`send-test-mail` on a campaign mail says the variant is not ready.** Wait for the background re-validation the last edit triggered: re-read `get-campaign-mail` and check the variant's `ready_to_send` before sending a test.
