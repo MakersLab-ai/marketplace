@@ -15656,6 +15656,82 @@ var GroundControlClient = class {
   saveJournalSummary(date3, agentSummary) {
     return this.request("POST", `/journal/${date3}/summary`, { agent_summary: agentSummary });
   }
+  // Datasheets (called "tables" on the wire: /api/v1/tables…). Every one of
+  // these 404s in a workspace without the feature flag — the same answer as a
+  // datasheet that does not exist, so the module's existence doesn't leak.
+  // Ported from openclaw-plugin/src/client.ts (canonical); keep them in sync.
+  listTables(params) {
+    return this.request("GET", `/tables${this.qs(params)}`);
+  }
+  getTable(id) {
+    return this.request("GET", `/tables/${id}`);
+  }
+  createTable(input) {
+    return this.request("POST", "/tables", input);
+  }
+  updateTable(id, input) {
+    return this.request("PATCH", `/tables/${id}`, input);
+  }
+  deleteTable(id) {
+    return this.request("DELETE", `/tables/${id}`);
+  }
+  addField(tableId, input) {
+    return this.request("POST", `/tables/${tableId}/fields`, input);
+  }
+  updateField(tableId, fieldId, input) {
+    return this.request("PATCH", `/tables/${tableId}/fields/${fieldId}`, input);
+  }
+  deleteField(tableId, fieldId) {
+    return this.request("DELETE", `/tables/${tableId}/fields/${fieldId}`);
+  }
+  // One page of rows, exactly as asked for.
+  listRows(tableId, params) {
+    return this.request("GET", `/tables/${tableId}/rows${this.qs(params)}`);
+  }
+  // Every row matching the query, paged like listComments(): the route caps
+  // `limit` at 200, so "give me the datasheet" is several requests and a single
+  // call would silently answer with the first 200 rows — a truncated list and a
+  // complete one look identical to the reader. The order is deterministic
+  // (chosen sort, then `id`), which is what makes offset paging safe; rows are
+  // still deduped by id because a row inserted mid-walk shifts the boundary and
+  // hands the same row to two pages. `maxPages` is a fan-out backstop, not a
+  // display limit — when it bites, `meta.truncated` says so instead of the
+  // answer just ending.
+  async listAllRows(tableId, params, maxPages = 25) {
+    const PAGE = 200;
+    const seen = /* @__PURE__ */ new Set();
+    const data = [];
+    let fetched = 0;
+    let matched = 0;
+    for (let page = 0; ; page++) {
+      if (page >= maxPages) return { data, meta: { total: data.length, matched, truncated: true } };
+      const res = await this.listRows(tableId, { ...params ?? {}, limit: PAGE, offset: fetched });
+      const rows = res?.data ?? [];
+      matched = res?.meta?.total ?? 0;
+      fetched += rows.length;
+      for (const r of rows) {
+        if (r?.id) {
+          if (seen.has(r.id)) continue;
+          seen.add(r.id);
+        }
+        data.push(r);
+      }
+      if (rows.length < PAGE || fetched >= matched) break;
+    }
+    return { data, meta: { total: data.length, matched, truncated: false } };
+  }
+  createRows(tableId, rows) {
+    return this.request("POST", `/tables/${tableId}/rows`, { rows: rows.map((data) => ({ data })) });
+  }
+  updateRows(tableId, rows) {
+    return this.request("PATCH", `/tables/${tableId}/rows`, { rows });
+  }
+  deleteRows(tableId, ids) {
+    return this.request("DELETE", `/tables/${tableId}/rows`, { ids });
+  }
+  createTableComment(tableId, body) {
+    return this.request("POST", `/tables/${tableId}/comments`, { body });
+  }
 };
 
 // src/dotenv.ts
@@ -16227,6 +16303,237 @@ var searchTools = [
   }
 ];
 
+// src/tools/tables.ts
+function rowQueryParams(input) {
+  const { table_id: _t, filter, all: _a3, ...rest } = input ?? {};
+  const params = {};
+  if (filter) params.filter = JSON.stringify(filter);
+  for (const [k, v] of Object.entries(rest)) if (v !== void 0 && v !== null && v !== "") params[k] = String(v);
+  return params;
+}
+async function listRows(input, client) {
+  const params = rowQueryParams(input);
+  if (input?.all === true) {
+    delete params.limit;
+    delete params.offset;
+    return client.listAllRows(input.table_id, params);
+  }
+  return client.listRows(input.table_id, params);
+}
+var tableTools = [
+  {
+    name: "gc_list_tables",
+    description: "List the datasheets (user tables) you can see, with their fields. HTTP 404 = no datasheets module in this workspace: say so, don't retry.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        initiative_id: { type: "string" },
+        q: { type: "string" },
+        limit: { type: "number" },
+        offset: { type: "number" }
+      },
+      required: []
+    },
+    async execute(input, client) {
+      const params = {};
+      for (const [k, v] of Object.entries(input ?? {})) if (v !== void 0 && v !== null && v !== "") params[k] = String(v);
+      return client.listTables(params);
+    }
+  },
+  {
+    name: "gc_get_table",
+    description: "A datasheet's schema: field ids (fld_\u2026), types, option ids (opt_\u2026). Read it before writing rows. HTTP 404 = not found, or no datasheets module.",
+    inputSchema: {
+      type: "object",
+      properties: { table_id: { type: "string" } },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      return client.getTable(input.table_id);
+    }
+  },
+  {
+    name: "gc_create_table",
+    description: "Create a datasheet with its columns. Options are labels (ids returned). Visibility follows the initiative.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        description: { type: "string" },
+        initiative_id: { type: "string" },
+        fields: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
+              options: { type: "array", items: { type: "string" } },
+              required: { type: "boolean" }
+            },
+            required: ["name", "type"]
+          }
+        }
+      },
+      required: ["name"]
+    },
+    async execute(input, client) {
+      return client.createTable(input);
+    }
+  },
+  {
+    name: "gc_update_table",
+    description: "Rename, re-describe or move a datasheet to another initiative (creator/owner/admin).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+        initiative_id: { type: "string" }
+      },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      const { table_id, ...rest } = input;
+      return client.updateTable(table_id, rest);
+    }
+  },
+  {
+    name: "gc_delete_table",
+    description: "Delete a datasheet with all rows and comments; irreversible (creator/owner/admin).",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" } }, required: ["table_id"] },
+    async execute(input, client) {
+      return client.deleteTable(input.table_id);
+    }
+  },
+  {
+    name: "gc_add_field",
+    description: "Append a column. Options are labels (ids returned).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        name: { type: "string" },
+        type: { type: "string", enum: ["text", "number", "boolean", "date", "single_select", "multi_select"] },
+        options: { type: "array", items: { type: "string" } },
+        required: { type: "boolean" }
+      },
+      required: ["table_id", "name", "type"]
+    },
+    async execute(input, client) {
+      const { table_id, ...rest } = input;
+      return client.addField(table_id, rest);
+    }
+  },
+  {
+    name: "gc_update_field",
+    description: "Edit a column. options = the COMPLETE new list ({id, label} keeps, no id adds, omitted removes). The type is immutable.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        field_id: { type: "string", description: "fld_\u2026" },
+        name: { type: "string" },
+        required: { type: "boolean" },
+        position: { type: "number" },
+        options: {
+          type: "array",
+          items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } }, required: ["label"] }
+        }
+      },
+      required: ["table_id", "field_id"]
+    },
+    async execute(input, client) {
+      const { table_id, field_id, ...rest } = input;
+      return client.updateField(table_id, field_id, rest);
+    }
+  },
+  {
+    name: "gc_delete_field",
+    description: "Remove a column from a datasheet.",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" }, field_id: { type: "string" } }, required: ["table_id", "field_id"] },
+    async execute(input, client) {
+      return client.deleteField(input.table_id, input.field_id);
+    }
+  },
+  {
+    name: "gc_list_rows",
+    description: "Read rows. Filter select fields by option id (opt_\u2026), never label. all=true returns every match, else one page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        filter: { type: "array", items: { type: "object", additionalProperties: true }, description: "[{field, op, value}], AND-combined" },
+        sort: { type: "string", description: "fld_x:asc | fld_x:desc" },
+        q: { type: "string" },
+        all: { type: "boolean" },
+        limit: { type: "number" },
+        offset: { type: "number" }
+      },
+      required: ["table_id"]
+    },
+    async execute(input, client) {
+      return listRows(input, client);
+    }
+  },
+  {
+    name: "gc_create_rows",
+    description: "Add \u2264100 rows (all or nothing), each keyed by field id (fld_\u2026); select values are option ids. See gc_get_table.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        rows: { type: "array", items: { type: "object", additionalProperties: true }, minItems: 1, maxItems: 100 }
+      },
+      required: ["table_id", "rows"]
+    },
+    async execute(input, client) {
+      return client.createRows(input.table_id, input.rows);
+    }
+  },
+  {
+    name: "gc_update_rows",
+    description: "Change \u2264100 rows (all or nothing): [{id, data}], data keyed by field id, changed fields only; null clears.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table_id: { type: "string" },
+        rows: {
+          type: "array",
+          items: { type: "object", properties: { id: { type: "string" }, data: { type: "object", additionalProperties: true } }, required: ["id", "data"] },
+          minItems: 1,
+          maxItems: 100
+        }
+      },
+      required: ["table_id", "rows"]
+    },
+    async execute(input, client) {
+      return client.updateRows(input.table_id, input.rows);
+    }
+  },
+  {
+    name: "gc_delete_rows",
+    description: "Delete \u2264100 rows by id; unknown ids are skipped.",
+    inputSchema: {
+      type: "object",
+      properties: { table_id: { type: "string" }, ids: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 } },
+      required: ["table_id", "ids"]
+    },
+    async execute(input, client) {
+      return client.deleteRows(input.table_id, input.ids);
+    }
+  },
+  {
+    name: "gc_comment_table",
+    description: "Comment on a datasheet (Markdown, @-mentions): say what you changed and why.",
+    inputSchema: { type: "object", properties: { table_id: { type: "string" }, body: { type: "string" } }, required: ["table_id", "body"] },
+    async execute(input, client) {
+      return client.createTableComment(input.table_id, input.body);
+    }
+  }
+];
+
 // src/tools/index.ts
 var allTools = [
   ...contextTools,
@@ -16235,7 +16542,12 @@ var allTools = [
   ...objectiveTools,
   ...docTools,
   ...journalTools,
-  ...searchTools
+  ...searchTools,
+  // Datasheets: always served. Claude Code defers MCP tool schemas behind tool
+  // search, so 13 extra definitions cost little context here (the openclaw
+  // plugin folds them into one tool instead). Without the workspace module
+  // every call answers 404.
+  ...tableTools
 ];
 
 // src/index.ts
