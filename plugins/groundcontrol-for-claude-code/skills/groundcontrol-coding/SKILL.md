@@ -22,6 +22,7 @@ tools:
   - gc_create_objective
   - gc_update_objective
   - gc_update_key_result
+  - gc_submit_goal_checkin
   - gc_list_docs
   - gc_get_doc
   - gc_create_doc
@@ -181,7 +182,7 @@ Persist what you learn. Long-form research and decisions belong in **GC Docs** (
 The full GROUNDCONTROL surface is available, but tasks are the main driver. Use the rest sparingly:
 
 - **Docs** (`gc_create_doc`, `gc_update_doc`): When a task involves research or produces longer-form output that doesn't fit in a comment. Link the doc URL from the closing comment: `https://groundcontrol.makerslab.ai/docs/<id>`.
-- **OKRs** (`gc_update_key_result`): If a completed task moves a known KR, update the `current_value`. Don't fabricate KR connections — only update when the task is explicitly tagged.
+- **Goals** (`gc_update_key_result`): If a completed task moves a known KR, update the `current_value`. Don't fabricate KR connections — only update when the task is explicitly tagged.
 - **Journal** (`gc_save_journal_summary`): Optional, end-of-day reflection. Not part of the loop iteration.
 
 ## State File: `.gc-state.json`
@@ -200,3 +201,7 @@ Written at the end of every iteration, regardless of outcome — but the **value
 - Never push to `main` directly. Branches and PRs only.
 - Never echo or log the API key (`GC_API_KEY`). The MCP server already redacts it from tool errors; you should never put it in a comment, doc, or commit message.
 - Never modify `.env` or `.gitignore` from inside a loop iteration. Setup is `/gc-init`'s job.
+
+## Goal check-ins
+
+`gc_get_changes` returns `goal_checkins`. An item with `kind: kickoff|weekly` is a work mandate for a goal you own: follow its `playbook` (it is the source of truth, not this file), then call `gc_submit_goal_checkin`. `kind: reply` is your human answering your last check-in — act on it. With autonomy `approve` the tasks you plan wait in backlog until your human approves them; don't start them. You may change the goal itself or its key-result definitions (title, target, unit, add/remove KRs, status, autonomy, owner/agent/initiative) only when your human has explicitly asked for or approved that specific change — e.g. in a reply to your check-in, a comment, or an @-mention. Otherwise propose it (kr_proposals / recommendation in your check-in) and wait. Updating a KR's current value is always fine.
