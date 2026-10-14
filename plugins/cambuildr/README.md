@@ -9,12 +9,13 @@
 
 # Cambuildr Plugin
 
-Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campaign emails, automated (triggered) emails, workflows, target audiences, tags, the media library and supporters — directly from Claude.
+Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campaign emails, automated (triggered) emails, workflows, target audiences, tags, the media library, supporters and custom dashboards — directly from Claude.
 
 ## What this plugin does
 
 - **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, mail senders, and a person's action/UTM history.
-- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, restore a saved version, and send a test mail.
+- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, add a variant to a landing page or mail (a copy of an existing one, e.g. for an A/B test), restore a saved version, and send a test mail.
+- **Dashboards** (when custom dashboards are enabled): list, read, create and rename dashboards, replace their widget layout, and run any dashboard datasource ad hoc with `query-datasource` for structured analytics without building a dashboard.
 - **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity. Runs longer than about 40 seconds return a `run_id` to poll with `get-assistant-run` instead of blocking.
 
 Three things in Cambuildr are easy to confuse:
@@ -27,7 +28,7 @@ Three things in Cambuildr are easy to confuse:
 
 The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-The server exposes **48 tools, 5 prompts and 4 resources**.
+The server exposes **55 tools, 5 prompts and 6 resources**.
 
 ## Installation
 
@@ -81,6 +82,8 @@ The same guided workflows also ship on the server as MCP prompts, so they reach 
 | Tenant profile (flags, languages, base URL) | `cambuildr://tenant` |
 | Trigger action catalog | `cambuildr://trigger-actions` |
 | Workflow building blocks | `cambuildr://workflows/{workflow_id}/building-blocks` |
+| Dashboard datasource catalog (keys, params, limits) | `cambuildr://dashboards/datasources` |
+| Dashboard layout schema | `cambuildr://dashboards/schema` |
 
 ## Tenant prerequisites
 
@@ -89,6 +92,7 @@ The same guided workflows also ship on the server as MCP prompts, so they reach 
 | Feature flag `ai_mcp_server` | The MCP server itself. Without it there is no endpoint. |
 | Feature flag `ai_mcp_write_access` | Every write tool. Without it only the read tools are registered. |
 | AI opt-in for the customer | `instruct-assistant` and `get-assistant-run`. Without it both are **absent** while everything else works. `check-landing-page` needs the opt-in too, plus its own `ai_page_check` feature flag — missing means one of those two is off. |
+| Feature flag `custom_dashboards` | The dashboard tools and the two dashboard resources. Without it they are absent. |
 | Per-tool toggles at `/admin/settings/mcp` | Individual tools. A disabled tool is not registered. |
 
 `instruct-assistant` also needs AI credit; an exhausted balance returns an error asking for a top-up.
@@ -119,7 +123,7 @@ Two entity types have no blocks at all: a **target audience** is filter rules, a
 
 ## Workflow notes
 
-- **Two-step creation.** Every `create-*` tool returns an empty entity. The commands follow up with `instruct-assistant`. If you call the tools directly, do the same.
+- **Two-step creation.** `create-landing-page`, `create-campaign-mail`, `create-trigger`, `create-target-audience` and `create-workflow` return an empty entity. The commands follow up with `instruct-assistant`. If you call the tools directly, do the same. `create-content-variant` is different: it returns a copy of an existing variant, which you change with `instruct-assistant` and the returned `variant_id` (or `set-hosted-landing-page-content` on an AI-hosted page); the AI-hosted landing page tools take complete HTML up front.
 - **Bind triggers to internal actions.** `create-trigger` takes a name; `list-trigger-actions` gives the dotted `name.context` keys (`signed-up.campaign`, `donated.donation`, `has-birthday.database`); `set-trigger-action` binds one. A free-text action name requires an explicit `is_internal_action: false` and means an external webhook that no internal Cambuildr event fires.
 - **Target audiences start empty.** `create-target-audience` returns a group matching nobody. The `instruct-assistant` follow-up that writes its rules is mandatory, not optional.
 - **Triggered mails resolve their variant.** `instruct-assistant` no longer needs an explicit `variant_id`; the first variant is used.
@@ -127,6 +131,7 @@ Two entity types have no blocks at all: a **target audience** is filter rules, a
 - **A delete-person workflow cannot be self-activated.** `update-workflow active=true` on a graph containing a `delete_person` action returns a refusal saying review was requested; only Cambuildr can switch it on.
 - **Campaign mail state.** New campaign mails sit in `EDITING`. Advancing to `READY`, which schedules the send, is a manual step in the admin UI.
 - **Triggers and workflows stay inactive** until you flip `active=true`, which the commands do after the content is populated.
+- **Dashboard layouts are full replaces.** `set-dashboard-layout` takes the complete document every time; read it with `get-dashboard` and edit that. `update-dashboard` changes only the name and description and never touches the widgets. Widgets are account-wide unless they carry a `campaign_id`.
 - **Hosted landing pages are experimental.** They are raw-HTML pages with no editor, and none of the custom blocks apply to them. Call `get-hosted-landing-page-contract` before authoring one.
 
 ## Troubleshooting

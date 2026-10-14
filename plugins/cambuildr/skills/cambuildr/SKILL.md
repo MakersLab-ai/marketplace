@@ -5,18 +5,21 @@ description: >
   triggered/automated emails, workflows/automations, target audiences,
   supporters, donors, or asks to create/edit Cambuildr content. Use the
   cambuildr MCP tools; every tool name is kebab-case (list-content,
-  instruct-assistant, create-landing-page). Two-step rule: every create-* tool
-  returns an empty entity — always follow up with instruct-assistant to
-  populate it. Bind a triggered mail's firing event with list-trigger-actions
-  plus set-trigger-action, never with free-text action names.
-version: 0.5.0
+  instruct-assistant, create-landing-page). Two-step rule: create-landing-page,
+  create-campaign-mail, create-trigger, create-target-audience and
+  create-workflow return an empty entity — always follow up with
+  instruct-assistant to populate it; create-content-variant instead returns a
+  copy of an existing variant, edited the same way with its variant_id. Bind
+  a triggered mail's firing event with list-trigger-actions plus
+  set-trigger-action, never with free-text action names.
+version: 0.6.1
 ---
 
 # Cambuildr
 
-Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations) and the **media library**.
+Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations), the **media library** and **custom dashboards** (widget grids over the account's statistics, which also serve as a structured analytics read).
 
-The server exposes **48 tools, 5 prompts and 4 resources**.
+The server exposes **55 tools, 5 prompts and 6 resources**.
 
 ## Tool names are kebab-case
 
@@ -44,10 +47,14 @@ Read-only tenant reference data. Attach one once rather than re-fetching through
 | Tenant profile | `cambuildr://tenant` | Tenant name, public base URL, content languages, the MCP feature flags in effect, and whether write access and the AI assistant are available. |
 | Trigger action catalog | `cambuildr://trigger-actions` | The internal `name.context` trigger action keys, grouped by category. |
 | Workflow building blocks | `cambuildr://workflows/{workflow_id}/building-blocks` | Valid node kinds, action types and shapes, plus the tenant's real automated-mail, tag and campaign ids for one workflow. |
+| Dashboard datasource catalog | `cambuildr://dashboards/datasources` | Every dashboard datasource key with the question it answers, its params schema, a worked example, its marks and cost tier, plus the layout format, grid and widget limits, the cost budget and the accepted ranges. Read it before any dashboard tool. |
+| Dashboard layout schema | `cambuildr://dashboards/schema` | The JSON Schema of a dashboard layout document, to validate one before sending it. |
 
 ## Critical rule — two-step content workflow
 
-Every `create-*` tool returns an entity with an **empty body**. The next step is **always** `instruct-assistant` with the matching `entity_type` and a natural-language instruction. Never tell the user "the landing page / email / audience is done" before `instruct-assistant` has run.
+Every entity-creating `create-*` tool returns an entity with an **empty body**. The next step is **always** `instruct-assistant` with the matching `entity_type` and a natural-language instruction. Never tell the user "the landing page / email / audience is done" before `instruct-assistant` has run.
+
+The other `create-*` tools are not followed by a scaffold-then-fill step: `create-content-variant` returns a **copy** of an existing variant (body, subject, sender and custom blocks included) — change it with `instruct-assistant` and the returned `variant_id` (or `set-hosted-landing-page-content` on an AI-hosted page), not by starting from scratch; the AI-hosted tools (`create-hosted-landing-page`, `create-hosted-landing-page-variant`, `create-hosted-landing-page-signup-form`) take complete HTML or form fields up front.
 
 | Step | Tool | Purpose |
 |------|------|---------|
@@ -57,9 +64,9 @@ Every `create-*` tool returns an entity with an **empty body**. The next step is
 
 Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the content** — body, subject, preheader, audience filter rules, workflow graph.
 
-## Tool reference (48 tools)
+## Tool reference (55 tools)
 
-### Read (23)
+### Read (26)
 
 | Tool | Purpose |
 |------|---------|
@@ -86,6 +93,9 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `search-media-library` | Search the media library by `query`, `folder` and `kind` (`image` / `document`). Returns each match with its first-party URL. Paginated. |
 | `search` | One text query across landing pages, campaign mails, triggered mails, target audiences, workflows and people. Returns a short list, each row carrying a composite id (`landing_page:42`), a title and an admin URL. Exists because some clients — ChatGPT's connector among them — drive a server through a `search`/`fetch` pair rather than per-type tools. Prefer `list-content` / `list-people` when you want pagination and full rows. |
 | `fetch` | One record in full, by a composite id `search` returned. The other half of the same pair. |
+| `list-dashboards` | The tenant's custom dashboards: id, name, description, `widget_count`, `updated_at`, admin URL. Filter by `search`. Paginated. |
+| `get-dashboard` | One dashboard with its full stored `layout` document, exactly as it was written. **Call this before `set-dashboard-layout`.** Definition only — no numbers. |
+| `query-datasource` | Run one dashboard datasource once and get its data, saving nothing: `datasource`, `params`, optional `range` and `campaign_id`. The structured analytics read — no dashboard needed — and the way to check a widget before saving it. See the dashboards section. |
 
 ### Write — core entities (12)
 
@@ -104,15 +114,24 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `update-target-audience` | `name`, `description`. | Does not touch filter rules or archive state. |
 | `add-media-library-item` | Download a public `url` into the tenant's own storage under a hosted page's assets folder (`landing_page_id` required, optional `name`). Returns the first-party URL. | You do not choose the folder. Search first — do not re-add what the tenant already has. |
 
-### Write — content (3)
+### Write — content (4)
 
 Apply to landing pages, campaign mails and triggered mails alike (`entity_type` is `landing_page`, `campaign_mail` or `trigger`).
 
 | Tool | What's possible | What's NOT possible |
 |------|------------------|----------------------|
-| `duplicate-content` | Duplicate a campaign mail, triggered mail or landing page. Takes only `entity_type` and `entity_id` — no `variant_id` (it copies every variant). Returns the new id, its variants and admin URL. Make a safe copy before a risky rewrite. | Does not itself edit either copy — the new one starts identical to the source. |
+| `duplicate-content` | Duplicate a campaign mail, triggered mail or landing page. Takes only `entity_type` and `entity_id` — no `variant_id` (it copies every variant). Returns the new id, its variants and admin URL. Make a safe copy before a risky rewrite. A copied AI-hosted page's signup form endpoints point at the copy's own forms. | Does not itself edit either copy — the new one starts identical to the source. |
+| `create-content-variant` | Add a variant to a landing page, campaign mail or triggered mail — the admin's "add variant" button, e.g. for an A/B test. Copies an existing variant of the same entity (body, subject, sender, custom blocks): the **newest** one by default, or `source_variant_id`; an entity without variants gets an empty first variant. Optional `name` (default "Copy of …", or "Variant B" for triggered mails). A copied triggered mail variant starts unpublished, and so does a landing page variant added while the page is published — pass `publish: true` to put it into the A/B split right away (not for campaign mails, which split by `test_percent`). Returns the new `variant` (id, name, `is_published` except for campaign mails), every variant and the admin URL. Then edit it with `instruct-assistant` and its `variant_id`. For an AI-hosted landing page the copy keeps its HTML, with literal signup form endpoints pointed at the copy's own forms; edit it with `set-hosted-landing-page-content` instead. | Not for templates, campaign mails outside `EDITING`, or plans without A/B testing. Does not edit the copy itself. |
 | `restore-content-version` | Restore one of `list-content-versions`' saved versions onto the live variant (`variant_id` required, for landing pages, campaign mails and triggered mails alike). Non-destructive: the restore itself is snapshotted as a new version, so it is never a one-way trip — an assistant edit can always be undone this way, because the pre-edit body is saved as a version before a variant's first assistant edit. Campaign mails only while `EDITING`. | Does not restore a target audience's rules or a workflow's graph — neither is versioned this way. |
 | `send-test-mail` | Send a test of a campaign mail or triggered mail variant to the token owner, or another admin user of the tenant. At most 5 recipients per call, 10 test mails per hour per user. For a campaign mail, wait until the variant's `ready_to_send` is `true` (re-read `get-campaign-mail`) first. | Cannot send to an arbitrary address — recipients must be administrators of the tenant. Refused when mail sending is disabled for the tenant. |
+
+### Write — dashboards (3)
+
+| Tool | What's possible |
+|------|------------------|
+| `create-dashboard` | `name`, optional `description`, optional `layout` document. Unlike every other `create-*` tool it can be created complete in one call — no `instruct-assistant` follow-up. |
+| `update-dashboard` | `name` and/or `description` only. The widgets are always kept. An empty `description` clears it. |
+| `set-dashboard-layout` | Replace the **complete** `layout` document. A full replace, never a diff. |
 
 ### Write — workflows (4)
 
@@ -324,6 +343,45 @@ A workflow is a multi-step automation: one enrolling event, then a graph of acti
 
 `update-workflow`'s `reenrollment` is `ONCE` (a person enrolls at most once, ever) or `EVERY_TIME` (a person may re-enroll after a previous run has ended).
 
+## Dashboards
+
+**Registered only when the tenant has the `custom_dashboards` feature enabled** (and, for the three writers, `ai_mcp_write_access`). Missing from the tool list means the feature is off, not a connection problem.
+
+A dashboard is one JSON document of widgets on a 12-column grid. A widget never carries a query: it names a **datasource key** and that datasource's own **params**, where it sits and how it is drawn.
+
+```json
+{
+  "version": 1,
+  "range": "last_30_days",
+  "widgets": [
+    {
+      "id": "people-total",
+      "title": "People over time",
+      "position": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": "kpi.series",
+      "params": {"keys": ["people_total"]},
+      "mark": "line"
+    }
+  ]
+}
+```
+
+### Build order
+
+1. Read `cambuildr://dashboards/datasources` — the datasource keys, each one's params schema, worked example, supported marks and cost tier, and the limits (grid width, widget height, widget count, cost budget).
+2. `query-datasource` each widget you plan, with the params you plan to save. An answer with `ok: false` says what to change; fix it there, before it is on a dashboard.
+3. `create-dashboard` with the whole `layout`, or `set-dashboard-layout` on an existing one.
+4. Tell the user the admin URL the response returns.
+
+### Rules
+
+- **Writes are full replaces.** `set-dashboard-layout` stores exactly the document you send: read it with `get-dashboard`, edit that, send every widget back, and keep each widget's `id`.
+- **Renaming never touches widgets.** Use `update-dashboard` for the name and description; it neither reads nor re-validates the layout, so it also works on a dashboard whose stored layout no longer validates.
+- **Account-wide unless asked.** A widget, and a `query-datasource` call, is account-wide unless it carries its own `campaign_id`. Set one only when the user asked about a single campaign: `donations.statistics` and `purchases.statistics` refuse any campaign scope rather than answer it with account-wide figures, and `workflow.runs` and `events.participants` refuse a campaign their workflow or event is not part of.
+- **Ranges.** `last_7_days`, `last_30_days`, `last_90_days`, `this_month`, `last_month`, `this_year`, `last_year`, or a fixed `YYYY-MM-DD;YYYY-MM-DD` window. The document carries no timezone: it resolves in the viewing user's, and `query-datasource` in the token user's. Some datasources take their period from their own params instead.
+- **A refused write saves nothing.** It returns `errors` as `{code, message, widget_id}`; each message says what to fix. Correct the document and send it again in full.
+- **`query-datasource` returns `{widget_id, ok, data: {columns, rows, meta}, error: {code, message}, request}`.** `request` echoes the range, campaign and timezone actually used. Error codes: `unknown_datasource`, `refused` (bad params, a foreign id, a window or row limit — the message says which), `not_available` (too expensive for these params), `failed` (an internal error, already reported).
+
 ## Hosted (externally authored) landing pages
 
 **Experimental.** Cambuildr can host a landing page whose content is raw HTML you author, instead of an editor (BeeFree) page. The page still gets variant logic, signups and metrics, but it has no editor — its HTML is managed only through these tools, and none of the custom blocks above apply to it.
@@ -334,11 +392,12 @@ Pick a hosted page when the user wants full control over the markup, or a page b
 
 1. `get-hosted-landing-page-contract` — **first, always.** It states what Cambuildr injects for you, the asset rules, and the endpoint conventions.
 2. `create-hosted-landing-page` with a complete HTML document as `body_html` (or without it, and set the content later).
-3. `create-hosted-landing-page-signup-form` if the page collects signups. It returns the submit endpoint and a field schema; render inputs whose names match that schema.
-4. `set-hosted-landing-page-content` to iterate, `create-hosted-landing-page-variant` to A/B test.
+3. `create-hosted-landing-page-signup-form` if the page collects signups. It returns the submit endpoint and a field schema; render inputs whose names match that schema. Write the endpoint into the HTML as one literal string, so a copy of the variant or page can point it at its own form.
+4. `set-hosted-landing-page-content` to iterate. To A/B test, `create-hosted-landing-page-variant` adds a variant with fresh HTML, and `create-content-variant` copies an existing one (then change the copy with `set-hosted-landing-page-content`).
 
 ### Authoring rules
 
+- Edit hosted pages only through these tools. `instruct-assistant` refuses a hosted page and names the tools to use instead, and a hosted page cannot be saved as a template.
 - Submit a single, complete HTML document with `<html>`, `<head>` and `<body>`. One missing a `<head>` or `<body>` is rejected.
 - Inline your CSS and JavaScript.
 - Do **not** embed cookie consent, analytics, pixels, Alpine.js, fonts, icons, meta tags or the tenant's global scripts. Cambuildr injects all of them on render; embedding them duplicates them.
