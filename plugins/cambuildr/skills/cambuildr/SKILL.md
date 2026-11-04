@@ -12,14 +12,14 @@ description: >
   copy of an existing variant, edited the same way with its variant_id. Bind
   a triggered mail's firing event with list-trigger-actions plus
   set-trigger-action, never with free-text action names.
-version: 0.6.1
+version: 0.6.2
 ---
 
 # Cambuildr
 
 Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations), the **media library** and **custom dashboards** (widget grids over the account's statistics, which also serve as a structured analytics read).
 
-The server exposes **55 tools, 5 prompts and 6 resources**.
+The server exposes **57 tools, 5 prompts and 6 resources**.
 
 ## Tool names are kebab-case
 
@@ -64,9 +64,9 @@ The other `create-*` tools are not followed by a scaffold-then-fill step: `creat
 
 Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the content** — body, subject, preheader, audience filter rules, workflow graph.
 
-## Tool reference (55 tools)
+## Tool reference (57 tools)
 
-### Read (26)
+### Read (27)
 
 | Tool | Purpose |
 |------|---------|
@@ -84,6 +84,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `get-campaign-mail` | Full campaign-mail details: state, planned date, A/B test settings, target audiences, tags, and variants with `name`, `subject`, `preheader`, `reply_to`, `mail_sender_id`, `sender`, `body_updated_at`, `validation_state` (`INITIALIZING`, `RUNNING`, `FAILED` or `COMPLETED`) and `ready_to_send` (`email_subject` still returned as a deprecated alias for `subject`). `update-campaign-mail-variant`, `restore-content-version` and an assistant edit all re-run this validation in the background — re-read `get-campaign-mail` and wait until `ready_to_send` is `true` before `send-test-mail`. |
 | `get-trigger` | Full triggered-mail details: active state, action configuration, delay settings, and variants with their subject, sender, content and `body_updated_at`. |
 | `get-target-audience` | Target-audience details: people count, computation state, archive status, `is_legacy`, and the filter `rules` themselves as `{include, exclude}` plus a plain-language `rules_summary`. `rules` is `{include: [], exclude: []}` for an empty (ruleless) audience — it is `null` only for a legacy audience (`is_legacy: true`), one built before the current rule format. |
+| `list-target-audience-versions` | A target audience's saved versions, newest first: `id`, `created_at`, `source` (`assistant` or `restore`), `name`, `description`, `saved_by_user_id`, `saved_by_name` and the `rules_summary` that version held. A version is saved before every assistant change to an audience that already has rules, and before every restore; edits saved with the builder's Save button are not versioned. The 20 newest, not paginated. |
 | `get-workflow` | One workflow: metadata, the current published graph, its start condition, and the building blocks a graph may reference. **Call this before `set-workflow-graph`.** |
 | `get-hosted-landing-page-contract` | The authoring contract for externally authored pages. An optional `landing_page_id` adds that page's variant ids and existing signup forms. |
 | `get-content` | Read a landing page / campaign mail / triggered mail variant's body as `outline`, `text` (mails: as-sent plain text) or the stored `html` (merge tags left unresolved — `{{ var:firstname }}`, not a filled-in value). Returns `preview_url` and `body_updated_at` alongside the content. `preview_url` is the authenticated admin preview: it opens for a human in a logged-in browser tab, but an agent cannot fetch it directly. Read this before editing, and again after `instruct-assistant` to see what changed. |
@@ -97,7 +98,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `get-dashboard` | One dashboard with its full stored `layout` document, exactly as it was written. **Call this before `set-dashboard-layout`.** Definition only — no numbers. |
 | `query-datasource` | Run one dashboard datasource once and get its data, saving nothing: `datasource`, `params`, optional `range` and `campaign_id`. The structured analytics read — no dashboard needed — and the way to check a widget before saving it. See the dashboards section. |
 
-### Write — core entities (12)
+### Write — core entities (13)
 
 | Tool | What's possible | What's NOT possible |
 |------|------------------|----------------------|
@@ -112,6 +113,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `set-trigger-action` | Set or replace the firing event of an existing triggered mail: `action` (a `name.context` key) plus `source_id`, `class_id` and `product_ids` where applicable. | Values must come from `list-trigger-actions`; do not invent them. |
 | `create-target-audience` | Create an empty target audience: `name`, `description`. Returns id + admin URL. | **The group has no filter rules and therefore matches nobody.** Rules go through `instruct-assistant`. |
 | `update-target-audience` | `name`, `description`. | Does not touch filter rules or archive state. |
+| `restore-target-audience-version` | Put one of `list-target-audience-versions`' versions back on the audience: its rules, `name` and `description` replace the current ones and the people are recalculated (`id` and `version_id` required). Non-destructive: the replaced state is saved as a new version, so an assistant edit — or a restore — can always be undone this way. Refused when its rules would change while the audience is being recalculated; an unchanged audience answers `status: "unchanged"`. | A version taken before a tag, custom field or audience was renamed may bring back the old name inside its rules. |
 | `add-media-library-item` | Download a public `url` into the tenant's own storage under a hosted page's assets folder (`landing_page_id` required, optional `name`). Returns the first-party URL. | You do not choose the folder. Search first — do not re-add what the tenant already has. |
 
 ### Write — content (4)
@@ -122,7 +124,7 @@ Apply to landing pages, campaign mails and triggered mails alike (`entity_type` 
 |------|------------------|----------------------|
 | `duplicate-content` | Duplicate a campaign mail, triggered mail or landing page. Takes only `entity_type` and `entity_id` — no `variant_id` (it copies every variant). Returns the new id, its variants and admin URL. Make a safe copy before a risky rewrite. A copied AI-hosted page's signup form endpoints point at the copy's own forms. | Does not itself edit either copy — the new one starts identical to the source. |
 | `create-content-variant` | Add a variant to a landing page, campaign mail or triggered mail — the admin's "add variant" button, e.g. for an A/B test. Copies an existing variant of the same entity (body, subject, sender, custom blocks): the **newest** one by default, or `source_variant_id`; an entity without variants gets an empty first variant. Optional `name` (default "Copy of …", or "Variant B" for triggered mails). A copied triggered mail variant starts unpublished, and so does a landing page variant added while the page is published — pass `publish: true` to put it into the A/B split right away (not for campaign mails, which split by `test_percent`). Returns the new `variant` (id, name, `is_published` except for campaign mails), every variant and the admin URL. Then edit it with `instruct-assistant` and its `variant_id`. For an AI-hosted landing page the copy keeps its HTML, with literal signup form endpoints pointed at the copy's own forms; edit it with `set-hosted-landing-page-content` instead. | Not for templates, campaign mails outside `EDITING`, or plans without A/B testing. Does not edit the copy itself. |
-| `restore-content-version` | Restore one of `list-content-versions`' saved versions onto the live variant (`variant_id` required, for landing pages, campaign mails and triggered mails alike). Non-destructive: the restore itself is snapshotted as a new version, so it is never a one-way trip — an assistant edit can always be undone this way, because the pre-edit body is saved as a version before a variant's first assistant edit. Campaign mails only while `EDITING`. | Does not restore a target audience's rules or a workflow's graph — neither is versioned this way. |
+| `restore-content-version` | Restore one of `list-content-versions`' saved versions onto the live variant (`variant_id` required, for landing pages, campaign mails and triggered mails alike). Non-destructive: the restore itself is snapshotted as a new version, so it is never a one-way trip — an assistant edit can always be undone this way, because the pre-edit body is saved as a version before a variant's first assistant edit. Campaign mails only while `EDITING`. | Does not restore a target audience's rules (use `restore-target-audience-version`) or a workflow's graph — neither is versioned this way. |
 | `send-test-mail` | Send a test of a campaign mail or triggered mail variant to the token owner, or another admin user of the tenant. At most 5 recipients per call, 10 test mails per hour per user. For a campaign mail, wait until the variant's `ready_to_send` is `true` (re-read `get-campaign-mail`) first. | Cannot send to an arbitrary address — recipients must be administrators of the tenant. Refused when mail sending is disabled for the tenant. |
 
 ### Write — dashboards (3)
@@ -308,6 +310,7 @@ Choose an external binding only when the user says the event comes from another 
 1. `create-target-audience` with `name` and `description`.
 2. `instruct-assistant` with `entity_type: target_audience` and a natural-language description of who belongs in it ("everyone who donated more than 50 euros in the last year and is not already tagged Major Donor").
 3. `get-target-audience` to read back the people count and the computation state, and report the count to the user. It also returns the rules themselves — `rules: {include, exclude}` plus a plain-language `rules_summary` — and `is_legacy` for an audience built before the current rule format. Use these to check what the assistant actually wrote, not just how many people matched.
+4. To undo an assistant edit of the rules, `list-target-audience-versions` and `restore-target-audience-version` — a version is saved before every assistant change to an audience that already has rules, and before every restore.
 
 Rule authoring over MCP runs through `instruct-assistant`, so it needs the tenant's AI opt-in. Without it, rules have to be built in the admin UI.
 

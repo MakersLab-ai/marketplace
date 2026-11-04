@@ -13,8 +13,8 @@ Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campai
 
 ## What this plugin does
 
-- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, mail senders, and a person's action/UTM history.
-- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, add a variant to a landing page or mail (a copy of an existing one, e.g. for an A/B test), restore a saved version, and send a test mail.
+- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, a target audience's saved versions, mail senders, and a person's action/UTM history.
+- **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, add a variant to a landing page or mail (a copy of an existing one, e.g. for an A/B test), restore a saved version (also of a target audience's rules), and send a test mail.
 - **Dashboards** (when custom dashboards are enabled): list, read, create and rename dashboards, replace their widget layout, and run any dashboard datasource ad hoc with `query-datasource` for structured analytics without building a dashboard.
 - **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity. Runs longer than about 40 seconds return a `run_id` to poll with `get-assistant-run` instead of blocking.
 
@@ -28,7 +28,7 @@ Three things in Cambuildr are easy to confuse:
 
 The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-The server exposes **55 tools, 5 prompts and 6 resources**.
+The server exposes **57 tools, 5 prompts and 6 resources**.
 
 ## Installation
 
