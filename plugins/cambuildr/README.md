@@ -13,7 +13,7 @@ Manage your [Cambuildr](https://cambuildr.com/) tenant — landing pages, campai
 
 ## What this plugin does
 
-- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, a target audience's saved versions, mail senders, and a person's action/UTM history.
+- **Read**: list and inspect landing pages, campaign mails, triggered mails, workflows, target audiences, tags, custom fields, media library items and people records — including a variant's body content and its saved version history, a target audience's saved versions, mail senders, a person's action/UTM history, and the EU compliance overview (orientation, not legal advice).
 - **Write**: create and update landing pages, campaign mails, triggered mails, target audiences and workflows. Bind trigger actions. Set workflow start conditions and graphs. Author externally hosted HTML landing pages and their signup forms. Add media library items. Set a campaign mail or trigger variant's subject, preheader, reply-to and sender directly. Duplicate content, add a variant to a landing page or mail (a copy of an existing one, e.g. for an A/B test), restore a saved version (also of a target audience's rules), and send a test mail.
 - **Dashboards** (when custom dashboards are enabled): list, read, create and rename dashboards, replace their widget layout, and run any dashboard datasource ad hoc with `query-datasource` for structured analytics without building a dashboard.
 - **AI content**: fill the body of a landing page or email, the rules of a target audience, or the graph of a workflow with natural-language instructions via `instruct-assistant`. The commands always follow a `create-*` call with `instruct-assistant`, so you never end up with an empty entity. Runs longer than about 40 seconds return a `run_id` to poll with `get-assistant-run` instead of blocking.
@@ -28,7 +28,7 @@ Three things in Cambuildr are easy to confuse:
 
 The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-The server exposes **57 tools, 5 prompts and 6 resources**.
+The server exposes **58 tools, 5 prompts and 6 resources**.
 
 ## Installation
 
@@ -93,6 +93,7 @@ The same guided workflows also ship on the server as MCP prompts, so they reach 
 | Feature flag `ai_mcp_write_access` | Every write tool. Without it only the read tools are registered. |
 | AI opt-in for the customer | `instruct-assistant` and `get-assistant-run`. Without it both are **absent** while everything else works. `check-landing-page` needs the opt-in too, plus its own `ai_page_check` feature flag — missing means one of those two is off. |
 | Feature flag `custom_dashboards` | The dashboard tools and the two dashboard resources. Without it they are absent. |
+| Feature flag `compliance_overview` | `get-compliance-overview`. Without it the tool is absent. |
 | Per-tool toggles at `/admin/settings/mcp` | Individual tools. A disabled tool is not registered. |
 
 `instruct-assistant` also needs AI credit; an exhausted balance returns an error asking for a top-up.

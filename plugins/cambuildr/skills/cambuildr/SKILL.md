@@ -12,14 +12,14 @@ description: >
   copy of an existing variant, edited the same way with its variant_id. Bind
   a triggered mail's firing event with list-trigger-actions plus
   set-trigger-action, never with free-text action names.
-version: 0.6.2
+version: 0.7.0
 ---
 
 # Cambuildr
 
 Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations), the **media library** and **custom dashboards** (widget grids over the account's statistics, which also serve as a structured analytics read).
 
-The server exposes **57 tools, 5 prompts and 6 resources**.
+The server exposes **58 tools, 5 prompts and 6 resources**.
 
 ## Tool names are kebab-case
 
@@ -64,9 +64,9 @@ The other `create-*` tools are not followed by a scaffold-then-fill step: `creat
 
 Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the content** — body, subject, preheader, audience filter rules, workflow graph.
 
-## Tool reference (57 tools)
+## Tool reference (58 tools)
 
-### Read (27)
+### Read (28)
 
 | Tool | Purpose |
 |------|---------|
@@ -78,6 +78,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `list-trigger-actions` | The internal trigger action catalog. No arguments returns the `name.context` keys grouped by category; `action` returns that key's valid sources; `action` plus `source_id` returns the valid classes/answers (and the selectable Stripe products for purchase actions). |
 | `list-workflows` | The tenant's automation workflows: id, name, description, active state, re-enrollment policy, and whether a graph version is published. Filter by `search` and `active`. Paginated. |
 | `list-mail-senders` | The tenant's mail senders with `ready_to_send`. Gives the ids `update-campaign-mail-variant`'s and `update-trigger-variant`'s `mail_sender_id` expect. Paginated. |
+| `get-compliance-overview` | The tenant's EU compliance overview: which rules likely apply, how the settings compare with the recommendations, and the profile's `unanswered_questions` with their allowed answers. Orientation, not legal advice: relay what applies, never say something is legally compliant, and point to Settings → Compliance or the data protection officer. Read-only; the profile is answered in the admin at `admin_url`, which is null (like the check edit links) for a role that cannot open the page; such a role also gets no current setting values and no profile answers. Needs the `compliance_overview` feature flag. |
 | `list-content-versions` | A landing page / campaign mail / trigger variant's saved body versions, newest first: `id`, `created_at`, `saved_by_user_id`, `source` (`user` or `assistant`). Paginated. |
 | `list-person-actions` | One person's action timeline: `name`, `vendor`, `context`, `created_at`, and per-action UTM parameters. Paginated, newest first. |
 | `get-landing-page` | Full landing-page details: name, description, page title, publish state, slug, variants (now with `body_updated_at`), tags, plus `goal` (the user's goal, or the AI-inferred one when none is set) and `goal_source` (`user`, `inferred` or `none`). |
