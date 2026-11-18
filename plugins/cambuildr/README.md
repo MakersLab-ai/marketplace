@@ -28,7 +28,7 @@ Three things in Cambuildr are easy to confuse:
 
 The server derives every tool name from its class name in kebab-case: `list-target-audiences`, `instruct-assistant`, `set-workflow-graph`. There are no PascalCase names. Read the `cambuildr://tools` resource when you are unsure — it is authoritative for the tenant you are connected to.
 
-The server exposes **58 tools, 5 prompts and 6 resources**.
+The server exposes **61 tools, 5 prompts and 6 resources**.
 
 ## Installation
 
@@ -91,7 +91,7 @@ The same guided workflows also ship on the server as MCP prompts, so they reach 
 |---|---|
 | Feature flag `ai_mcp_server` | The MCP server itself. Without it there is no endpoint. |
 | Feature flag `ai_mcp_write_access` | Every write tool. Without it only the read tools are registered. |
-| AI opt-in for the customer | `instruct-assistant` and `get-assistant-run`. Without it both are **absent** while everything else works. `check-landing-page` needs the opt-in too, plus its own `ai_page_check` feature flag — missing means one of those two is off. |
+| AI opt-in for the customer | `instruct-assistant` and `get-assistant-run`. Without it both are **absent** while everything else works. `check-landing-page`, `check-campaign-mail` and `check-triggered-mail` need the opt-in too, plus their own `ai_page_check` feature flag — missing means one of those two is off. |
 | Feature flag `custom_dashboards` | The dashboard tools and the two dashboard resources. Without it they are absent. |
 | Feature flag `compliance_overview` | `get-compliance-overview`. Without it the tool is absent. |
 | Per-tool toggles at `/admin/settings/mcp` | Individual tools. A disabled tool is not registered. |

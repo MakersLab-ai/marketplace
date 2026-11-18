@@ -19,7 +19,7 @@ version: 0.7.0
 
 Cambuildr is a Laravel-based CRM for non-profits and campaigns. The MCP server lets Claude read and manage the tenant's **people / supporters**, **target audiences (groups)**, **tags and custom fields**, **landing pages** (editor-built and externally authored), **campaign emails** (scheduled broadcasts), **triggered emails** (event-driven single mails), **workflows** (multi-step automations), the **media library** and **custom dashboards** (widget grids over the account's statistics, which also serve as a structured analytics read).
 
-The server exposes **58 tools, 5 prompts and 6 resources**.
+The server exposes **61 tools, 5 prompts and 6 resources**.
 
 ## Tool names are kebab-case
 
@@ -64,7 +64,7 @@ The other `create-*` tools are not followed by a scaffold-then-fill step: `creat
 
 Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the content** — body, subject, preheader, audience filter rules, workflow graph.
 
-## Tool reference (58 tools)
+The server exposes **61 tools, 5 prompts and 6 resources**.
 
 ### Read (28)
 
@@ -76,6 +76,7 @@ Use `update-*` for **entity metadata**. Use `instruct-assistant` for **the conte
 | `list-tags` | The tenant's tags, consentable ones included. Tag ids are what `update-campaign-mail`'s `tag_ids` and a hosted signup form's `tags[]` input expect. Paginated. |
 | `list-custom-fields` | The tenant's custom fields with their type and, for select-style fields, their allowed values. Paginated. |
 | `list-trigger-actions` | The internal trigger action catalog. No arguments returns the `name.context` keys grouped by category; `action` returns that key's valid sources; `action` plus `source_id` returns the valid classes/answers (and the selectable Stripe products for purchase actions). |
+| `list-api-connections` | The tenant's API connections (id, name, base_url, auth_type; never credentials), when settings for developers are enabled. A `call_webhook` node uses one with `connection_id` + a relative `path` instead of `url`, and must not carry an `Authorization` header row. |
 | `list-workflows` | The tenant's automation workflows: id, name, description, active state, re-enrollment policy, and whether a graph version is published. Filter by `search` and `active`. Paginated. |
 | `list-mail-senders` | The tenant's mail senders with `ready_to_send`. Gives the ids `update-campaign-mail-variant`'s and `update-trigger-variant`'s `mail_sender_id` expect. Paginated. |
 | `get-compliance-overview` | The tenant's EU compliance overview: which rules likely apply, how the settings compare with the recommendations, and the profile's `unanswered_questions` with their allowed answers. Orientation, not legal advice: relay what applies, never say something is legally compliant, and point to Settings → Compliance or the data protection officer. Read-only; the profile is answered in the admin at `admin_url`, which is null (like the check edit links) for a role that cannot open the page; such a role also gets no current setting values and no profile answers. Needs the `compliance_overview` feature flag. |
@@ -154,7 +155,7 @@ Apply to landing pages, campaign mails and triggered mails alike (`entity_type` 
 | `create-hosted-landing-page-variant` | Add an A/B variant with its own `body_html`, optional `name`, `is_published`, and `starts_at` / `ends_at` (ISO 8601). |
 | `create-hosted-landing-page-signup-form` | Define a signup form for a hosted variant. Returns the form id, the submit endpoint and a field schema to render a plain HTML form against. |
 
-### AI content (2)
+### AI content (4)
 
 `instruct-assistant(entity_type, entity_id, variant_id?, instruction)`.
 
@@ -193,6 +194,16 @@ A run's edits apply straight to the **live** landing page / mail / trigger conte
 - A `feature_fit` finding says the page's goal calls for a Cambuildr block the page is not using — a donation block for a fundraising page, a supporter block for a petition — and names that block in `location.block_type`. That is the same block id `instruct-assistant` takes, so the fix is a follow-up `instruct-assistant` call, not a question back to the user about what the block is called.
 - Because it runs synchronously it reviews the page's content only: it skips the screenshot, dead-link, page-speed and accessibility passes an admin-triggered check makes, so it makes no pixel judgement — nothing about how the page renders, how it looks on a phone, broken links, page speed, alt text, headings, colour contrast or font size. It *does* report the document's own ordering, so a call to action written far down the page is still flagged.
 - **Registered only when the tenant has both the AI opt-in and the `ai_page_check` feature enabled** — narrower gating than `instruct-assistant`, which needs only the opt-in. Missing from the tool list means one of those two is off, not a connection problem.
+
+### Checking a mail
+
+`check-campaign-mail(campaign_mail_id, variant_id?, goal?)` and `check-triggered-mail(trigger_id, variant_id?, goal?)` run the email check on one mail variant against the mail goal and return a deterministic score from 0-100, a summary and findings, each with a severity and a suggested fix. Call one after `instruct-assistant` has set the content and before sending or activating the mail.
+
+- `variant_id` defaults to the winning variant of a campaign mail, or the published variant of a triggered mail, and failing that the first variant.
+- `goal`, when given, is saved as the mail's goal (same field `update-campaign-mail` / `update-trigger` write); otherwise the mail's already-saved or inferred goal is used.
+- Every finding carries one of the categories `subject`, `message`, `cta`, `trust`, `personalization`, `goal_fit`, `feature_fit`, `setup`, `deliverability`, `accessibility`, `tracking`, `compliance`. Content findings are fixed with `instruct-assistant`, subject and sender findings with `update-campaign-mail-variant` / `update-trigger-variant`.
+- `compliance` findings are never scored. When one is present the result carries `notices`: pass them on to the user with the finding — it is orientation, not legal advice. A finding's `detail` can be `null` for a user who cannot open the compliance settings.
+- Runs synchronously and can take up to a minute. Spends AI credits on every call. Registered under the same two gates as `check-landing-page` (AI opt-in and `ai_page_check`).
 
 ## Capability matrix — what each `entity_type` can build
 
