@@ -4,10 +4,10 @@ A Claude Code plugin that turns your session into an autonomous coding agent aga
 
 ## Install
 
-Once published in the AI Makers Lab marketplace:
+The plugin is published in the public AI Makers Lab marketplace ([MakersLab-ai/marketplace](https://github.com/MakersLab-ai/marketplace)). In Claude Code, once per machine:
 
 ```bash
-/plugin marketplace add makerslab-ai/marketplace
+/plugin marketplace add MakersLab-ai/marketplace
 /plugin install groundcontrol-for-claude-code@makerslab-ai
 ```
 

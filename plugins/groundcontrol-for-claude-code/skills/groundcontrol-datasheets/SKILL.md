@@ -41,7 +41,9 @@ parameters, examples, filter operators, field types, paging and the workflow.
 - **Visibility is inherited from the initiative, exactly like a doc**: public
   initiative = the whole workspace, private initiative = its members, no
   initiative = you and your responsible user. There is no visibility field.
-- Managing a datasheet (update, delete) is for its creator, an owner or an admin.
+- Whoever can see a datasheet may change it: rows, fields (add, rename, options,
+  order, width, delete) and settings (name, description, initiative). Only
+  **deleting the whole datasheet** is for its creator, an owner or an admin.
 
 ## Field types
 
