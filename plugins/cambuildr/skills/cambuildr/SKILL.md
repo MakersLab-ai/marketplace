@@ -144,7 +144,7 @@ Apply to landing pages, campaign mails and triggered mails alike (`entity_type` 
 | `create-workflow` | Create an **empty** workflow: `name`, `description`, optional `campaign_id`. Inactive, no graph, no start condition. |
 | `set-workflow-start-condition` | Set (replace) the single event that enrolls a person: `action` (a `name.context` key from `list-trigger-actions`) plus `source_id`, `class_id`, `subclass_id`, `product_ids` and a `value_min` / `value_max` range where applicable, and `allow_automation_origin` to opt into cascades. |
 | `set-workflow-graph` | Replace the graph with the **complete** set of `nodes` and `edges` and publish it as a new version. |
-| `update-workflow` | `name`, `description`, `reenrollment` (`ONCE` / `EVERY_TIME`), `active`. |
+| `update-workflow` | `name`, `description`, `reenrollment` (`ONCE` / `EVERY_TIME` / `EVERY_EVENT`), `active`. |
 
 ### Write — hosted (externally authored) landing pages (4)
 
@@ -348,6 +348,7 @@ A workflow is a multi-step automation: one enrolling event, then a graph of acti
 - A wait node is either a duration or an absolute date.
 - Webhook URLs must be HTTPS on port 443 and resolve to a public address; localhost, private ranges and cloud metadata endpoints are refused.
 - A secret webhook header value comes back from `get-workflow` as a sentinel placeholder. **Send that sentinel back unchanged** to keep the stored credential; replacing it overwrites the credential with whatever you sent.
+- A webhook step calls once per person by default. `"delivery": "collected"` with a `list_key` and optional `shared_fields` collects people into one call per minute instead: `{shared fields…, "<list_key>": [ {fields per person}, … ]}`, at most 500 people per call; a call that fails with no answer, a server error (5xx), 408 or 429 is repeated every 30 minutes for up to 24 hours, and any other refusal (4xx) fails at once and can be sent again by hand. `list_key` may only hold letters, digits, `_` and `-`. Shared values may only hold constants and the `{{ context:… }}` keys that are the same for every person (workflow, node, action and source keys); non-secret header values only constants, `workflow_id`, `workflow_name`, `customer_id`, `node_id` and `idempotency_token`. `{{ var:… }}` belongs in `fields`.
 - An invalid graph is rejected with its error codes and nothing is saved.
 
 ### Activation
@@ -356,7 +357,7 @@ A workflow is a multi-step automation: one enrolling event, then a graph of acti
 
 ### Re-enrollment
 
-`update-workflow`'s `reenrollment` is `ONCE` (a person enrolls at most once, ever) or `EVERY_TIME` (a person may re-enroll after a previous run has ended).
+`update-workflow`'s `reenrollment` is `ONCE` (a person enrolls at most once, ever), `EVERY_TIME` (a person may re-enroll after a previous run has ended) or `EVERY_EVENT` (every event enrolls, even while an earlier run is still open, so a person can be in the workflow several times at once; a repeated delivery of the same event enrolls once; finished runs are removed after 60 days by default, and a customer can be configured to keep them longer).
 
 ## Dashboards
 

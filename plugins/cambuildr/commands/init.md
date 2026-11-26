@@ -59,7 +59,7 @@ tenant), use `/cambuildr:connect`.
   tenant. Tell the user to enable it at `/admin/settings/mcp` (or ask their Cambuildr
   account admin).
 - **Tools still missing after `/cambuildr:connect`** → in Claude Code, restart so it
-  re-reads the config; in a Claude app, re-open the connector in Settings and click
+  re-reads the config; in a Claude app, re-open the connector in Customize → Connectors and click
   **Connect**.
 - **The feature flag is off** (`ai_mcp_server` missing) → a tenant-level Cambuildr
   setting the account admin must enable.

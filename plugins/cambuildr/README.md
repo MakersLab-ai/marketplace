@@ -32,11 +32,15 @@ The server exposes **61 tools, 5 prompts and 6 resources**.
 
 ## Installation
 
+**Claude Code:**
+
 ```
-/plugin marketplace add makerslab-ai/marketplace
+/plugin marketplace add MakersLab-ai/marketplace
 /plugin install cambuildr@makerslab-ai
 /cambuildr:connect
 ```
+
+**Claude apps (chat, Desktop, Cowork; paid plans):** open **Customize → Plugins**, click **Add → Add marketplace**, enter `MakersLab-ai/marketplace`, and install the Cambuildr plugin. Then run `/cambuildr:connect`, or add the connector yourself under **Customize → Connectors**. A plugin added in the Claude apps syncs to Claude Code when you sign in with the same account.
 
 `/cambuildr:connect` asks for your tenant and wires up the connector — a slug (`acme`), a host, or a full URL all work. Your Cambuildr admin also shows the exact MCP server URL and per-client setup steps at **`/admin/settings/mcp`**, if you would rather add the connection by hand in your client's own settings.
 
@@ -46,7 +50,7 @@ Both paths update through `/plugin marketplace update` then `/plugin update`. No
 
 ### Claude Desktop (`.mcpb`)
 
-Out of scope. The `.mcpb` bundle format is stdio-only and cannot express a remote OAuth-authenticated HTTP server, which is what the Cambuildr MCP endpoint is. Use Claude Code, or add the connector by hand in a Claude app as `/cambuildr:connect` describes.
+Out of scope. The `.mcpb` bundle format is stdio-only and cannot express a remote OAuth-authenticated HTTP server, which is what the Cambuildr MCP endpoint is. Add the plugin through **Customize → Plugins** instead, as above.
 
 ## Components
 
@@ -144,8 +148,8 @@ Two entity types have no blocks at all: a **target audience** is filter rules, a
 - **Only read tools are present.** The `ai_mcp_write_access` feature flag is off for your tenant.
 - **One specific tool is missing.** It is toggled off at `/admin/settings/mcp`.
 - **"Feature `ai_mcp_server` not available."** The feature flag must be enabled for the tenant.
-- **Connected to the wrong tenant.** Re-run `/cambuildr:connect`; in Claude Code remove the old server first with `claude mcp remove cambuildr`, in a Claude app delete the connector in Settings.
-- **No browser opened on the first tool call.** In Claude Code, restart so it re-reads the MCP config; in a Claude app, re-open the connector in Settings and click **Connect**.
+- **Connected to the wrong tenant.** Re-run `/cambuildr:connect`; in Claude Code remove the old server first with `claude mcp remove cambuildr`, in a Claude app remove the connector in **Customize → Connectors**.
+- **No browser opened on the first tool call.** In Claude Code, restart so it re-reads the MCP config; in a Claude app, re-open the connector in **Customize → Connectors** and click **Connect**.
 - **My trigger is not firing.** Check `get-trigger`. It needs both `active: true` **and** an internal action binding. A trigger whose action came from free text is an external webhook binding and no Cambuildr event will fire it — rebind it with `set-trigger-action`.
 - **My target audience matches nobody.** It was created without rules. Run `instruct-assistant` with `entity_type: target_audience`, then re-read the count with `get-target-audience`.
 - **My workflow does nothing.** It needs a start condition (`set-workflow-start-condition`), a published graph (`set-workflow-graph`), and `active=true`.

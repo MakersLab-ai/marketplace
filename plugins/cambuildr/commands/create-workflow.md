@@ -26,7 +26,7 @@ Then gather:
 - **Campaign** — should the workflow be filed under a campaign? Optional; omit to leave it standalone.
 - **The enrolling event** — in plain language ("when someone donates", "when a person signs up on the spring campaign"). Do not ask for an action name; you resolve it in step 3.
 - **The steps**, in order — which emails to send, which tags to attach, how long to wait between steps, what to branch on.
-- **Re-enrollment** — may a person go through this more than once? `ONCE` (at most once, ever) or `EVERY_TIME` (may re-enroll after a previous run ended).
+- **Re-enrollment** — may a person go through this more than once? `ONCE` (at most once, ever), `EVERY_TIME` (may re-enroll after a previous run ended) or `EVERY_EVENT` (every event enrolls, even while an earlier run is still open, so a person can be in it several times at once; finished runs are removed after 60 days by default, and a customer can be configured to keep them longer).
 
 ## Step 2 — Scaffold
 
@@ -101,12 +101,13 @@ Rules that matter:
 - Only `CONDITION` nodes may have more than one outgoing edge; their out-edges are labelled `branch: "yes"` and/or `branch: "no"`, at most one of each and no other value. There is no `else` branch: leave a branch unwired and the run simply ends on that side. An edge that does not leave a `CONDITION` carries no branch.
 - A wait is either a duration or an absolute date.
 - Webhook URLs must be HTTPS on port 443 and resolve to a public address. A secret webhook header value comes back from `get-workflow` as a sentinel placeholder — send it back **unchanged** to keep the stored credential; anything else overwrites it.
+- A webhook step sends one call per person by default. With `"delivery": "collected"`, a `list_key` and optional `shared_fields`, it sends many people in one call once per minute (`{shared fields…, "<list_key>": [ {fields per person}, … ]}`, at most 500 per call). A call that fails with no answer, a server error (5xx), 408 or 429 is repeated every 30 minutes for up to 24 hours; any other refusal (4xx) fails at once and can be sent again by hand. `list_key` may only hold letters, digits, `_` and `-`. Shared values may only hold constants and the `{{ context:… }}` keys that are the same for every person (workflow, node, action and source keys); non-secret header values only constants, `workflow_id`, `workflow_name`, `customer_id`, `node_id` and `idempotency_token`. Person values belong in `fields`.
 - An invalid graph is rejected with error codes and nothing is saved. Fix and resend the whole graph.
 
 ## Step 6 — Set re-enrollment
 
 ```
-update-workflow(id=<workflow id>, reenrollment="ONCE" | "EVERY_TIME")
+update-workflow(id=<workflow id>, reenrollment="ONCE" | "EVERY_TIME" | "EVERY_EVENT")
 ```
 
 ## Step 7 — Activate, last

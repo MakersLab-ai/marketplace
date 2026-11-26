@@ -34,7 +34,7 @@ at the wrong tenant, remove it first (see below) and re-add.
 Confirm the CLI is present, then add the server user-wide:
 
 ```bash
-command -v claude && claude mcp add --transport http cambuildr "<URL>" --scope user
+command -v claude && claude mcp add --transport http --scope user cambuildr "<URL>"
 ```
 
 - `--scope user` makes the connector available in every project. Use `--scope local`
@@ -46,15 +46,20 @@ command -v claude && claude mcp add --transport http cambuildr "<URL>" --scope u
 
 **If you cannot run shell commands (you're in a Claude app — Cowork, Desktop, or web):**
 
-You can't create the connector automatically here — connectors are added in Settings
-by design, and there's no tool to do it from the conversation. Give the user these
-exact, personalized steps:
+You can't create the connector automatically here — connectors are added in the
+Customize menu by design, and there's no tool to do it from the conversation. Give the
+user these exact, personalized steps:
 
-1. Open **Settings → Connectors** and click **Add custom connector**.
+1. Open **Customize → Connectors**, click **+** and choose **Add custom connector**.
 2. **Name:** `cambuildr` (use this exact name so the `/cambuildr:*` commands find it).
-3. **Remote MCP server URL:** `<URL>`
-4. Leave OAuth Client ID / Secret blank — Cambuildr uses OAuth 2.1 discovery.
-5. Save, then click **Connect** and log in when the browser prompts.
+3. **Remote MCP server URL:** `<URL>`, then click **Continue**.
+4. Keep the suggested sign-in settings (Cambuildr uses OAuth 2.1 discovery, there is no
+   client ID or secret to enter) and click **Add**.
+5. Click **Connect** and log in when the browser prompts.
+
+On a Team or Enterprise plan only an owner can add a custom connector: they add it once
+under **Organization settings → Connectors**, and the user then clicks **Connect** next
+to it in **Customize → Connectors**.
 
 Then wait for the user to confirm they've added and connected it before continuing.
 
@@ -89,12 +94,12 @@ Report back:
   tenant. Tell the user to enable it at `/admin/settings/mcp` (or ask their Cambuildr
   account admin).
 - **No browser tab opened / tools still missing** → in Claude Code, restart so it
-  re-reads the config; in a Claude app, re-open the connector in Settings and click
-  **Connect**.
+  re-reads the config; in a Claude app, re-open the connector in **Customize → Connectors**
+  and click **Connect**.
 - **The feature flag is off** (`ai_mcp_server` missing) → a tenant-level Cambuildr
   setting; the account admin must enable it.
 - **Only read tools appear** → `ai_mcp_write_access` is off for the tenant.
 - **`instruct-assistant` is absent** → the tenant has not opted in to the AI assistant.
   Not a connection fault; say so and carry on with the other tools.
 - **Wrong tenant URL** → re-run this command; remove the bad server first
-  (`claude mcp remove cambuildr` in Claude Code, or delete the connector in Settings).
+  (`claude mcp remove cambuildr` in Claude Code, or remove the connector in **Customize → Connectors**).
